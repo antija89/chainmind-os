@@ -94,3 +94,23 @@
 ✅ Plan Store with versioning and diff view
 ✅ Audit Trail with immutable logging
 ✅ Responsive layout and professional styling
+
+## Phase 11: Excel Seeding
+- [ ] Parse Excel file and extract all sheets
+- [ ] Create seed script for fg_master, rm_master, bom, inventory, sales_history, forecast, po_data, suppliers
+- [ ] Execute seed script and verify data in DB
+- [ ] Wire Data Tables page to live DB queries
+
+## Phase 12: LLM Integration
+- [ ] Add LLM_API_KEY and LLM_API_BASE_URL secrets
+- [ ] Create server-side agent chat tRPC endpoint with invokeLLM
+- [ ] Wire AgentChat page to call real LLM endpoint
+- [ ] Add agent-specific system prompts with supply chain context
+- [ ] Persist conversation history to agent_messages table
+
+## Phase 13: Role-Based Access Control
+- [ ] Extend user role enum (admin, ops_head, planner)
+- [ ] Add adminProcedure and opsHeadProcedure guards
+- [ ] Enforce route-level access in frontend
+- [ ] Show/hide sidebar items by role
+- [ ] Restrict HIL approve/reject to ops_head and admin only
