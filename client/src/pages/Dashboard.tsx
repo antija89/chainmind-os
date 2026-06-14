@@ -2,6 +2,7 @@ import { useAuth } from "@/_core/hooks/useAuth";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { AlertCircle, TrendingUp, Package, Zap } from "lucide-react";
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
 
 export default function Dashboard() {
   const { user } = useAuth();
@@ -65,6 +66,14 @@ export default function Dashboard() {
     },
   ];
 
+  const trendData = [
+    { week: "W20", serviceLevel: 95.2, forecastAccuracy: 85.1, inventoryDOS: 31.2 },
+    { week: "W21", serviceLevel: 94.8, forecastAccuracy: 86.3, inventoryDOS: 30.5 },
+    { week: "W22", serviceLevel: 94.5, forecastAccuracy: 87.1, inventoryDOS: 29.8 },
+    { week: "W23", serviceLevel: 94.3, forecastAccuracy: 87.3, inventoryDOS: 28.9 },
+    { week: "W24", serviceLevel: 94.2, forecastAccuracy: 87.5, inventoryDOS: 28.3 },
+  ];
+
   return (
     <div className="space-y-6">
       <div>
@@ -96,6 +105,28 @@ export default function Dashboard() {
           );
         })}
       </div>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>KPI Trends (Last 5 Weeks)</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <ResponsiveContainer width="100%" height={300}>
+            <LineChart data={trendData}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+              <XAxis dataKey="week" stroke="#6b7280" />
+              <YAxis stroke="#6b7280" />
+              <Tooltip 
+                contentStyle={{ backgroundColor: "#fff", border: "1px solid #e5e7eb", borderRadius: "0.5rem" }}
+                formatter={(value) => typeof value === "number" ? value.toFixed(1) : value}
+              />
+              <Line type="monotone" dataKey="serviceLevel" stroke="#3b82f6" name="Service Level %" strokeWidth={2} dot={{ fill: "#3b82f6", r: 4 }} />
+              <Line type="monotone" dataKey="forecastAccuracy" stroke="#10b981" name="Forecast Accuracy %" strokeWidth={2} dot={{ fill: "#10b981", r: 4 }} />
+              <Line type="monotone" dataKey="inventoryDOS" stroke="#f59e0b" name="Inventory DOS (days)" strokeWidth={2} dot={{ fill: "#f59e0b", r: 4 }} />
+            </LineChart>
+          </ResponsiveContainer>
+        </CardContent>
+      </Card>
 
       <Card>
         <CardHeader>

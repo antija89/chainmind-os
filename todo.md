@@ -17,7 +17,7 @@
 - [x] Build dashboard home page with KPI scorecards
 - [x] Display service level, forecast accuracy, inventory DOS, open POs
 - [x] Create real-time alert feed
-- [ ] Add KPI trend charts (Phase 2)
+- [x] Add KPI trend charts (Phase 2)
 
 ## Phase 4: Agent Chat Pages
 - [x] Create chat interface component with streaming support
@@ -27,16 +27,16 @@
 - [x] Build Procurement Planner chat page
 - [x] Build Ops Head chat page
 - [x] Implement agent-specific system prompts
-- [ ] Add message history persistence (Phase 2)
-- [ ] Implement LLM streaming responses (Phase 2)
+- [x] Add message history persistence (Phase 2)
+- [x] Implement LLM streaming responses (Phase 2)
 
 ## Phase 5: HIL Inbox
 - [x] Create HIL gates table and workflow
 - [x] Build "Needs Your Input" queue UI
 - [x] Implement Approve/Reject/Override actions
 - [x] Add mandatory reason logging
-- [ ] Create escalation chain logic (Phase 2)
-- [ ] Add notification triggers for hard gates (Phase 2)
+- [x] Create escalation chain logic (Phase 2)
+- [x] Add notification triggers for hard gates (Phase 2)
 
 ## Phase 6: Data Tables
 - [x] Build FG Master table view

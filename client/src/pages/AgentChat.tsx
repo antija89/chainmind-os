@@ -1,139 +1,168 @@
 import { useState } from "react";
-import { useAuth } from "@/_core/hooks/useAuth";
+import { useParams } from "wouter";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Send, Loader2 } from "lucide-react";
-import { useParams } from "wouter";
+import { Streamdown } from "streamdown";
+
+interface Message {
+  id: string;
+  role: "user" | "assistant";
+  content: string;
+  timestamp: string;
+}
+
+const AGENTS = {
+  demand_planner: {
+    title: "Demand Planner",
+    icon: "📊",
+    description: "Analyze demand patterns and create forecasts",
+    color: "bg-blue-50",
+  },
+  supply_planner: {
+    title: "Supply Planner",
+    icon: "📦",
+    description: "Optimize supply chain and supplier coordination",
+    color: "bg-red-50",
+  },
+  production_planner: {
+    title: "Production Planner",
+    icon: "🏭",
+    description: "Plan production schedules and capacity",
+    color: "bg-teal-50",
+  },
+  procurement_planner: {
+    title: "Procurement Planner",
+    icon: "🤝",
+    description: "Manage procurement and vendor relationships",
+    color: "bg-yellow-50",
+  },
+  ops_head: {
+    title: "Ops Head",
+    icon: "👔",
+    description: "Executive oversight and decision making",
+    color: "bg-purple-50",
+  },
+};
 
 export default function AgentChat() {
-  const { user } = useAuth();
-  const params = useParams();
-  const agentId = params?.agentId || "demand_planner";
-  
-  const [messages, setMessages] = useState<Array<{ role: string; content: string }>>([
+  const { agentId } = useParams<{ agentId: string }>();
+  const agent = AGENTS[agentId as keyof typeof AGENTS] || AGENTS.demand_planner;
+
+  const [messages, setMessages] = useState<Message[]>([
     {
+      id: "1",
       role: "assistant",
-      content: "Hello! I am the Demand Planner agent. How can I help you with demand forecasting and S&OP planning today?",
+      content: `Hello! I'm the ${agent.title}. ${agent.description}. How can I help you today?`,
+      timestamp: new Date().toLocaleTimeString(),
     },
   ]);
+
   const [input, setInput] = useState("");
-  const [loading, setLoading] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
 
-  const agentInfo: Record<string, any> = {
-    demand_planner: {
-      title: "Demand Planner",
-      color: "#00D4B8",
-      icon: "📊",
-      domain: "Demand forecasting, S&OP, channel planning",
-    },
-    supply_planner: {
-      title: "Supply Planner",
-      color: "#FF6B6B",
-      icon: "📦",
-      domain: "Supply planning, inventory optimization",
-    },
-    production_planner: {
-      title: "Production Planner",
-      color: "#4ECDC4",
-      icon: "🏭",
-      domain: "Production scheduling, capacity planning",
-    },
-    procurement_planner: {
-      title: "Procurement Planner",
-      color: "#FFD93D",
-      icon: "🤝",
-      domain: "Procurement, supplier management",
-    },
-    ops_head: {
-      title: "Ops Head",
-      color: "#6C5CE7",
-      icon: "👔",
-      domain: "S&OP orchestration, conflict resolution",
-    },
-  };
-
-  const agent = agentInfo[agentId] || agentInfo.demand_planner;
-
-  const handleSend = async () => {
+  const handleSendMessage = async () => {
     if (!input.trim()) return;
 
-    const userMessage = input;
+    const userMessage: Message = {
+      id: Date.now().toString(),
+      role: "user",
+      content: input,
+      timestamp: new Date().toLocaleTimeString(),
+    };
+
+    setMessages((prev) => [...prev, userMessage]);
     setInput("");
-    setMessages((prev) => [...prev, { role: "user", content: userMessage }]);
-    setLoading(true);
+    setIsLoading(true);
 
     setTimeout(() => {
-      const responses: Record<string, string> = {
-        demand_planner: "I've analyzed the sales history for the requested SKU. The forecast shows a 12% growth trend for the next 13 weeks with 85% confidence. Should I apply promo uplift adjustments?",
-        supply_planner: "The supply plan is now constrained. We have a 2,000-unit gap in weeks 3-4. I recommend increasing production capacity or expediting raw material orders.",
-        production_planner: "Current line utilization is at 78.5%. I can accommodate the additional 2,000 units with minimal changeover impact. Shall I build the revised schedule?",
-        procurement_planner: "MRP analysis shows 3 materials at risk. Lead times are critical for SKU-001. I recommend placing expedited orders with our top 2 suppliers.",
-        ops_head: "All functions have submitted their inputs. Service level vs. cost trade-off is favorable. I recommend approving the constrained supply plan.",
+      const assistantMessage: Message = {
+        id: (Date.now() + 1).toString(),
+        role: "assistant",
+        content: `I've analyzed your request about "${input}". Based on current data, here are my recommendations:\n\n**Key Insights:**\n- Service Level Target: 95%\n- Current Forecast Accuracy: 87.5%\n- Inventory Days of Supply: 28.3 days\n\n**Recommended Actions:**\n1. Increase safety stock by 5% to improve service level\n2. Review demand forecast methodology for Q3\n3. Coordinate with supply chain on lead time optimization\n\nWould you like me to elaborate on any of these recommendations?`,
+        timestamp: new Date().toLocaleTimeString(),
       };
 
-      setMessages((prev) => [
-        ...prev,
-        {
-          role: "assistant",
-          content: responses[agentId] || "I've processed your request. What would you like me to do next?",
-        },
-      ]);
-      setLoading(false);
-    }, 1000);
+      setMessages((prev) => [...prev, assistantMessage]);
+      setIsLoading(false);
+    }, 1500);
   };
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center gap-3">
-        <div className="text-4xl">{agent.icon}</div>
-        <div>
-          <h1 className="text-3xl font-bold text-gray-900">{agent.title}</h1>
-          <p className="text-gray-600 text-sm">{agent.domain}</p>
+      <div className={`${agent.color} p-6 rounded-lg border border-gray-200`}>
+        <div className="flex items-center gap-3">
+          <span className="text-4xl">{agent.icon}</span>
+          <div>
+            <h1 className="text-2xl font-bold text-gray-900">{agent.title}</h1>
+            <p className="text-gray-600">{agent.description}</p>
+          </div>
         </div>
       </div>
 
       <Card className="h-96 flex flex-col">
         <CardHeader>
-          <CardTitle className="text-lg">Conversation</CardTitle>
+          <CardTitle className="flex items-center justify-between">
+            <span>Conversation</span>
+            <Badge variant="outline">Ready</Badge>
+          </CardTitle>
         </CardHeader>
-        <CardContent className="flex-1 overflow-y-auto space-y-4">
-          {messages.map((msg, idx) => (
-            <div key={idx} className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}>
+
+        <CardContent className="flex-1 overflow-y-auto space-y-4 mb-4">
+          {messages.map((msg) => (
+            <div key={msg.id} className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}>
               <div
                 className={`max-w-xs px-4 py-2 rounded-lg ${
                   msg.role === "user"
-                    ? "bg-blue-600 text-white rounded-br-none"
+                    ? "bg-blue-500 text-white rounded-br-none"
                     : "bg-gray-100 text-gray-900 rounded-bl-none"
                 }`}
               >
-                <p className="text-sm">{msg.content}</p>
+                <Streamdown>{msg.content}</Streamdown>
+                <p className={`text-xs mt-1 ${msg.role === "user" ? "text-blue-100" : "text-gray-600"}`}>
+                  {msg.timestamp}
+                </p>
               </div>
             </div>
           ))}
-          {loading && (
+
+          {isLoading && (
             <div className="flex justify-start">
               <div className="bg-gray-100 text-gray-900 px-4 py-2 rounded-lg rounded-bl-none">
-                <Loader2 className="w-4 h-4 animate-spin" />
+                <Loader2 className="w-5 h-5 animate-spin" />
               </div>
             </div>
           )}
         </CardContent>
+
+        <div className="border-t p-4 flex gap-2">
+          <Input
+            placeholder="Ask me anything..."
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+            onKeyPress={(e) => e.key === "Enter" && handleSendMessage()}
+            disabled={isLoading}
+          />
+          <Button onClick={handleSendMessage} disabled={isLoading || !input.trim()}>
+            <Send className="w-4 h-4" />
+          </Button>
+        </div>
       </Card>
 
-      <div className="flex gap-2">
-        <Input
-          placeholder="Ask the agent a question..."
-          value={input}
-          onChange={(e) => setInput(e.target.value)}
-          onKeyPress={(e) => e.key === "Enter" && handleSend()}
-          disabled={loading}
-        />
-        <Button onClick={handleSend} disabled={loading || !input.trim()}>
-          <Send className="w-4 h-4" />
-        </Button>
-      </div>
+      <Card>
+        <CardHeader>
+          <CardTitle>Recent Actions</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-2">
+          <div className="text-sm text-gray-600">
+            <p>✓ Last forecast run: 2 hours ago</p>
+            <p>✓ Current plan status: Under Review (v5)</p>
+            <p>✓ Pending approvals: 3</p>
+          </div>
+        </CardContent>
+      </Card>
     </div>
   );
 }
