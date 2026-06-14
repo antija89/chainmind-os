@@ -12,6 +12,7 @@ import DataTables from "./pages/DataTables";
 import DataImport from "./pages/DataImport";
 import PlanStore from "./pages/PlanStore";
 import AuditTrail from "./pages/AuditTrail";
+import Settings from "./pages/Settings";
 
 function Router() {
   return (
@@ -23,6 +24,7 @@ function Router() {
       <Route path="/data-import" component={() => <ChainMindLayout><DataImport /></ChainMindLayout>} />
       <Route path="/plan-store" component={() => <ChainMindLayout><PlanStore /></ChainMindLayout>} />
       <Route path="/audit-trail" component={() => <ChainMindLayout><AuditTrail /></ChainMindLayout>} />
+      <Route path="/settings" component={() => <ChainMindLayout><Settings /></ChainMindLayout>} />
       <Route path="/404" component={NotFound} />
       <Route component={NotFound} />
     </Switch>

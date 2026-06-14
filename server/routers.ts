@@ -8,6 +8,7 @@ import { z } from 'zod';
 import { invokeLLM } from "./_core/llm";
 import { TRPCError } from '@trpc/server';
 import { importExcelData } from './excelImport';
+import { setLLMConfig, getLLMConfig } from './llmService';
 
 // Role-based access control middleware
 export const adminProcedure = protectedProcedure.use(({ ctx, next }) => {
@@ -26,6 +27,23 @@ export const opsHeadProcedure = protectedProcedure.use(({ ctx, next }) => {
 
 export const appRouter = router({
   system: systemRouter,
+  settings: router({
+    saveLlmConfig: publicProcedure
+      .input(z.object({
+        provider: z.enum(['gemini', 'openai', 'anthropic', 'custom']),
+        apiKey: z.string(),
+        apiUrl: z.string().optional(),
+        model: z.string(),
+      }))
+      .mutation(({ input }) => {
+        setLLMConfig(input);
+        return { success: true };
+      }),
+    getLlmConfig: publicProcedure.query(() => {
+      const config = getLLMConfig();
+      return config ? { ...config, apiKey: '***' } : null;
+    }),
+  }),
   auth: router({
     me: publicProcedure.query(opts => opts.ctx.user),
     logout: publicProcedure.mutation(({ ctx }) => {

@@ -3,7 +3,7 @@ import { useAuth } from "@/_core/hooks/useAuth";
 import { useLocation } from "wouter";
 import { Link } from "wouter";
 import { Button } from "@/components/ui/button";
-import { LogOut, Menu, X } from "lucide-react";
+import { LogOut, Menu, X, Settings as SettingsIcon } from "lucide-react";
 import { useState } from "react";
 
 interface ChainMindLayoutProps {
@@ -30,6 +30,7 @@ export default function ChainMindLayout({ children }: ChainMindLayoutProps) {
     { path: "/data-import", label: "Data Import", icon: "📥" },
     { path: "/plan-store", label: "Plan Store", icon: "📑" },
     { path: "/audit-trail", label: "Audit Trail", icon: "📜" },
+    { path: "/settings", label: "Settings", icon: "⚙️" },
   ];
 
   const isActive = (path: string) => location === path;
