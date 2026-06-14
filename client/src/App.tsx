@@ -9,6 +9,7 @@ import Dashboard from "./pages/Dashboard";
 import AgentChat from "./pages/AgentChat";
 import HilInbox from "./pages/HilInbox";
 import DataTables from "./pages/DataTables";
+import DataImport from "./pages/DataImport";
 import PlanStore from "./pages/PlanStore";
 import AuditTrail from "./pages/AuditTrail";
 
@@ -19,6 +20,7 @@ function Router() {
       <Route path="/agent/:agentId" component={() => <ChainMindLayout><AgentChat /></ChainMindLayout>} />
       <Route path="/hil-inbox" component={() => <ChainMindLayout><HilInbox /></ChainMindLayout>} />
       <Route path="/data-tables" component={() => <ChainMindLayout><DataTables /></ChainMindLayout>} />
+      <Route path="/data-import" component={() => <ChainMindLayout><DataImport /></ChainMindLayout>} />
       <Route path="/plan-store" component={() => <ChainMindLayout><PlanStore /></ChainMindLayout>} />
       <Route path="/audit-trail" component={() => <ChainMindLayout><AuditTrail /></ChainMindLayout>} />
       <Route path="/404" component={NotFound} />

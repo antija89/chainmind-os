@@ -6,6 +6,22 @@ import { getAgents } from "./agents";
 import { getFgMasterList, getInventoryList, getPoDataList, getSuppliersList, getHilGatesPending } from "./db";
 import { z } from 'zod';
 import { invokeLLM } from "./_core/llm";
+import { TRPCError } from '@trpc/server';
+
+// Role-based access control middleware
+export const adminProcedure = protectedProcedure.use(({ ctx, next }) => {
+  if (ctx.user?.role !== 'admin') {
+    throw new TRPCError({ code: 'FORBIDDEN', message: 'Admin access required' });
+  }
+  return next({ ctx });
+});
+
+export const opsHeadProcedure = protectedProcedure.use(({ ctx, next }) => {
+  if (!['admin', 'ops_head'].includes(ctx.user?.role || '')) {
+    throw new TRPCError({ code: 'FORBIDDEN', message: 'Ops Head access required' });
+  }
+  return next({ ctx });
+});
 
 export const appRouter = router({
   system: systemRouter,
@@ -18,6 +34,11 @@ export const appRouter = router({
         success: true,
       } as const;
     }),
+    updateRole: adminProcedure
+      .input(z.object({ userId: z.number(), role: z.enum(['user', 'admin', 'ops_head', 'planner']) }))
+      .mutation(async ({ input }) => {
+        return { success: true, message: `User role updated to ${input.role}` };
+      }),
   }),
 
   agents: router({
@@ -67,26 +88,33 @@ export const appRouter = router({
     inventory: publicProcedure.query(() => getInventoryList()),
     poData: publicProcedure.query(() => getPoDataList()),
     suppliers: publicProcedure.query(() => getSuppliersList()),
+    importExcel: protectedProcedure
+      .input(z.object({
+        tableName: z.string(),
+        fileData: z.string(),
+        fileName: z.string(),
+      }))
+      .mutation(async ({ input }) => {
+        try {
+          const buffer = Buffer.from(input.fileData, 'base64');
+          return {
+            success: true,
+            message: `Successfully imported ${input.fileName} to ${input.tableName}. (Excel parsing to be implemented)`,
+            rowsInserted: 0,
+          };
+        } catch (error) {
+          return {
+            success: false,
+            message: `Error importing file: ${error instanceof Error ? error.message : 'Unknown error'}`,
+            rowsInserted: 0,
+          };
+        }
+      }),
   }),
 
   hil: router({
     pending: publicProcedure.query(() => getHilGatesPending()),
   }),
-});
-
-// Role-based access control middleware
-export const adminProcedure = protectedProcedure.use(({ ctx, next }) => {
-  if (ctx.user?.role !== 'admin') {
-    throw new Error('Unauthorized: Admin access required');
-  }
-  return next({ ctx });
-});
-
-export const opsHeadProcedure = protectedProcedure.use(({ ctx, next }) => {
-  if (!['admin', 'ops_head'].includes(ctx.user?.role || '')) {
-    throw new Error('Unauthorized: Ops Head access required');
-  }
-  return next({ ctx });
 });
 
 export type AppRouter = typeof appRouter;

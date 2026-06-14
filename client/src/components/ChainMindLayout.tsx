@@ -27,6 +27,7 @@ export default function ChainMindLayout({ children }: ChainMindLayoutProps) {
     { path: "/", label: "Dashboard", icon: "📊" },
     { path: "/hil-inbox", label: "Needs Your Input", icon: "⚡", badge: "3" },
     { path: "/data-tables", label: "Data Tables", icon: "📋" },
+    { path: "/data-import", label: "Data Import", icon: "📥" },
     { path: "/plan-store", label: "Plan Store", icon: "📑" },
     { path: "/audit-trail", label: "Audit Trail", icon: "📜" },
   ];
