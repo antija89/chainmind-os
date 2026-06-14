@@ -1,6 +1,6 @@
 import { eq } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
-import { InsertUser, users } from "../drizzle/schema";
+import { InsertUser, users, agents, planStore, hilGates, fgMaster, rmMaster, inventory, poData, suppliers, auditLog, agentMessages } from "../drizzle/schema";
 import { ENV } from './_core/env';
 
 let _db: ReturnType<typeof drizzle> | null = null;
@@ -89,4 +89,95 @@ export async function getUserByOpenId(openId: string) {
   return result.length > 0 ? result[0] : undefined;
 }
 
-// TODO: add feature queries here as your schema grows.
+// ============ AGENT QUERIES ============
+
+export async function getAgents() {
+  const db = await getDb();
+  if (!db) return [];
+  return db.select().from(agents);
+}
+
+export async function getAgentById(agentId: string) {
+  const db = await getDb();
+  if (!db) return undefined;
+  const result = await db.select().from(agents).where(eq(agents.agentId, agentId)).limit(1);
+  return result[0];
+}
+
+// ============ PLAN STORE QUERIES ============
+
+export async function getPlansByType(type: string) {
+  const db = await getDb();
+  if (!db) return [];
+  return db.select().from(planStore).where(eq(planStore.type, type));
+}
+
+export async function getPlanById(planId: string) {
+  const db = await getDb();
+  if (!db) return undefined;
+  const result = await db.select().from(planStore).where(eq(planStore.planId, planId)).limit(1);
+  return result[0];
+}
+
+// ============ HIL GATE QUERIES ============
+
+export async function getHilGatesPending() {
+  const db = await getDb();
+  if (!db) return [];
+  return db.select().from(hilGates).where(eq(hilGates.status, 'pending'));
+}
+
+export async function getHilGateById(gateId: string) {
+  const db = await getDb();
+  if (!db) return undefined;
+  const result = await db.select().from(hilGates).where(eq(hilGates.gateId, gateId)).limit(1);
+  return result[0];
+}
+
+// ============ DATA LAKE QUERIES ============
+
+export async function getFgMasterList() {
+  const db = await getDb();
+  if (!db) return [];
+  return db.select().from(fgMaster);
+}
+
+export async function getRmMasterList() {
+  const db = await getDb();
+  if (!db) return [];
+  return db.select().from(rmMaster);
+}
+
+export async function getInventoryList() {
+  const db = await getDb();
+  if (!db) return [];
+  return db.select().from(inventory);
+}
+
+export async function getPoDataList() {
+  const db = await getDb();
+  if (!db) return [];
+  return db.select().from(poData);
+}
+
+export async function getSuppliersList() {
+  const db = await getDb();
+  if (!db) return [];
+  return db.select().from(suppliers);
+}
+
+// ============ AUDIT LOG QUERIES ============
+
+export async function getAuditLogs(limit: number = 100) {
+  const db = await getDb();
+  if (!db) return [];
+  return db.select().from(auditLog).limit(limit);
+}
+
+// ============ AGENT MESSAGE QUERIES ============
+
+export async function getAgentMessages(agentId: string, limit: number = 50) {
+  const db = await getDb();
+  if (!db) return [];
+  return db.select().from(agentMessages).where(eq(agentMessages.agentId, agentId)).limit(limit);
+}

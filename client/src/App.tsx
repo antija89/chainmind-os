@@ -4,31 +4,34 @@ import NotFound from "@/pages/NotFound";
 import { Route, Switch } from "wouter";
 import ErrorBoundary from "./components/ErrorBoundary";
 import { ThemeProvider } from "./contexts/ThemeContext";
-import Home from "./pages/Home";
+import ChainMindLayout from "./components/ChainMindLayout";
+import Dashboard from "./pages/Dashboard";
+import AgentChat from "./pages/AgentChat";
+import HilInbox from "./pages/HilInbox";
+import DataTables from "./pages/DataTables";
+import PlanStore from "./pages/PlanStore";
+import AuditTrail from "./pages/AuditTrail";
 
 function Router() {
-  // make sure to consider if you need authentication for certain routes
   return (
     <Switch>
-      <Route path={"/"} component={Home} />
-      <Route path={"/404"} component={NotFound} />
-      {/* Final fallback route */}
+      <Route path="/" component={() => <ChainMindLayout><Dashboard /></ChainMindLayout>} />
+      <Route path="/agent/:agentId" component={() => <ChainMindLayout><AgentChat /></ChainMindLayout>} />
+      <Route path="/hil-inbox" component={() => <ChainMindLayout><HilInbox /></ChainMindLayout>} />
+      <Route path="/data-tables" component={() => <ChainMindLayout><DataTables /></ChainMindLayout>} />
+      <Route path="/plan-store" component={() => <ChainMindLayout><PlanStore /></ChainMindLayout>} />
+      <Route path="/audit-trail" component={() => <ChainMindLayout><AuditTrail /></ChainMindLayout>} />
+      <Route path="/404" component={NotFound} />
       <Route component={NotFound} />
     </Switch>
   );
 }
-
-// NOTE: About Theme
-// - First choose a default theme according to your design style (dark or light bg), than change color palette in index.css
-//   to keep consistent foreground/background color across components
-// - If you want to make theme switchable, pass `switchable` ThemeProvider and use `useTheme` hook
 
 function App() {
   return (
     <ErrorBoundary>
       <ThemeProvider
         defaultTheme="light"
-        // switchable
       >
         <TooltipProvider>
           <Toaster />

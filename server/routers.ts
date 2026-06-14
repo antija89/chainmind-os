@@ -2,9 +2,10 @@ import { COOKIE_NAME } from "@shared/const";
 import { getSessionCookieOptions } from "./_core/cookies";
 import { systemRouter } from "./_core/systemRouter";
 import { publicProcedure, router } from "./_core/trpc";
+import { getAgents } from "./agents";
+import { getFgMasterList, getInventoryList, getPoDataList, getSuppliersList, getHilGatesPending } from "./db";
 
 export const appRouter = router({
-    // if you need to use socket.io, read and register route in server/_core/index.ts, all api should start with '/api/' so that the gateway can route correctly
   system: systemRouter,
   auth: router({
     me: publicProcedure.query(opts => opts.ctx.user),
@@ -17,12 +18,20 @@ export const appRouter = router({
     }),
   }),
 
-  // TODO: add feature routers here, e.g.
-  // todo: router({
-  //   list: protectedProcedure.query(({ ctx }) =>
-  //     db.getUserTodos(ctx.user.id)
-  //   ),
-  // }),
+  agents: router({
+    list: publicProcedure.query(() => getAgents()),
+  }),
+
+  data: router({
+    fgMaster: publicProcedure.query(() => getFgMasterList()),
+    inventory: publicProcedure.query(() => getInventoryList()),
+    poData: publicProcedure.query(() => getPoDataList()),
+    suppliers: publicProcedure.query(() => getSuppliersList()),
+  }),
+
+  hil: router({
+    pending: publicProcedure.query(() => getHilGatesPending()),
+  }),
 });
 
 export type AppRouter = typeof appRouter;
