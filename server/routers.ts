@@ -7,6 +7,7 @@ import { getFgMasterList, getInventoryList, getPoDataList, getSuppliersList, get
 import { z } from 'zod';
 import { invokeLLM } from "./_core/llm";
 import { TRPCError } from '@trpc/server';
+import { importExcelData } from './excelImport';
 
 // Role-based access control middleware
 export const adminProcedure = protectedProcedure.use(({ ctx, next }) => {
@@ -97,11 +98,8 @@ export const appRouter = router({
       .mutation(async ({ input }) => {
         try {
           const buffer = Buffer.from(input.fileData, 'base64');
-          return {
-            success: true,
-            message: `Successfully imported ${input.fileName} to ${input.tableName}. (Excel parsing to be implemented)`,
-            rowsInserted: 0,
-          };
+          const result = await importExcelData(input.tableName, buffer);
+          return result;
         } catch (error) {
           return {
             success: false,
