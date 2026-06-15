@@ -507,6 +507,7 @@ export const agentChatWithToolsRouter = router({
         }
 
         // If tools were called, do a second LLM call to generate the final response
+        // This allows the agent to call generate_chart after seeing the data
         if (toolCalls.length > 0) {
           const followUpResponse = await invokeLLM({
             messages: [
@@ -519,8 +520,39 @@ export const agentChatWithToolsRouter = router({
               },
               ...toolResultMessages,
             ],
+            tools: toolDefinitions,
+            tool_choice: 'auto',
           });
-          const followUpContent = followUpResponse?.choices?.[0]?.message?.content;
+          const followUpChoice = followUpResponse?.choices?.[0];
+          const followUpMessage = followUpChoice?.message;
+          const followUpContent = typeof followUpMessage?.content === 'string' ? followUpMessage.content : '';
+          const followUpToolCalls = followUpMessage?.tool_calls || [];
+          
+          // Execute any new tool calls from the follow-up response (e.g., generate_chart)
+          for (const toolCall of followUpToolCalls) {
+            const toolName = toolCall.function?.name || '';
+            try {
+              const toolArgs = JSON.parse(toolCall.function?.arguments || '{}');
+              const dbTool = dbTools.find((t: any) => t.name === toolName || t.toolId === toolName);
+              const result = await executeTool(toolName, toolArgs, dbTool);
+              toolResults.push(result);
+              
+              // Log tool execution
+              await logToolExecution({
+                toolId: toolName,
+                agentId: input.agentId,
+                messageId,
+                inputParams: toolArgs,
+                outputResult: result.result,
+                executionTime: result.executionTime,
+                status: result.status,
+                errorMessage: result.error,
+              }).catch(() => {});
+            } catch (error) {
+              console.error(`[Follow-up Tool] Error executing ${toolName}:`, error);
+            }
+          }
+          
           if (typeof followUpContent === 'string' && followUpContent.trim()) {
             assistantContent = followUpContent;
           }

@@ -258,6 +258,32 @@
 - [ ] Fix Audit Trail to log all agent conversations, prompts, and tool calls
 - [ ] Verify all 4 fixes work end-to-end
 
+## Phase 23: Debug & Fix LLM Chart Response Issue (IN PROGRESS)
+- [ ] Debug why LLM doesn't use chart tool for "Show me top 5 SKU sales as a bar chart"
+- [ ] Check tool_choice parameter and LLM response format
+- [ ] Verify chart tool is in the tools list sent to LLM
+- [ ] Test with exact user prompt and capture full LLM response
+- [ ] Fix LLM prompt to emphasize tool usage
+- [ ] Verify chart tool execution and inline rendering
+
+## Phase 24: Inter-Agent Communication for Reviewer (IN PROGRESS)
+- [ ] Implement Reviewer Agent inter-agent communication
+- [ ] Reviewer should chat with Demand Planner when response inadequate
+- [ ] Reviewer should request tool creation from Tool Agent if needed
+- [ ] Add agent-to-agent conversation logging
+- [ ] Create agent-to-agent conversation UI in dashboard
+- [ ] Implement feedback loop: Reviewer → Agent → Tool Agent → Agent
+
+## Phase 25: Pre-Deployment Testing & Gap Analysis (IN PROGRESS)
+- [ ] Create comprehensive test suite for all 5 agents
+- [ ] Test chart generation for all chart types
+- [ ] Test tool creation workflow end-to-end
+- [ ] Verify Audit Trail captures all interactions
+- [ ] Test Reviewer Agent intervention workflow
+- [ ] Test inter-agent communication
+- [ ] Identify and document all production gaps
+- [ ] Fix identified gaps
+
 ## Phase 20: S&OP Workflow Engine
 - [ ] Design S&OP workflow state machine
 - [ ] Implement demand planning phase
