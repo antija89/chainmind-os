@@ -506,6 +506,48 @@ export const agentChatWithToolsRouter = router({
           }
         }
 
+    
+    // Auto-detect chart requests and generate charts
+    const userMessage = input.message.toLowerCase();
+    const chartKeywords = ['chart', 'graph', 'bar chart', 'line chart', 'pie chart', 'visualization', 'visual', 'plot', 'diagram'];
+    const isChartRequest = chartKeywords.some(kw => userMessage.includes(kw));
+    
+    if (isChartRequest && toolResults.length > 0) {
+      // Extract data from tool results and generate a chart
+      const chartTool = toolDefinitions.find((t: any) => t.function?.name === 'generate_chart');
+      if (chartTool) {
+        try {
+          // Try to infer chart type and data from the results
+          const lastResult = toolResults[toolResults.length - 1];
+          if (lastResult && typeof lastResult === 'object') {
+            const chartSpec = {
+              type: 'bar',
+              title: 'Data Visualization',
+              labels: [],
+              values: []
+            };
+            
+            // Simple heuristic: if result has array data, use it for chart
+            if (Array.isArray(lastResult)) {
+              chartSpec.labels = lastResult.slice(0, 5).map((item: any) => 
+                typeof item === 'object' ? (item.name || item.sku || item.id || 'Item') : String(item)
+              );
+              chartSpec.values = lastResult.slice(0, 5).map((item: any) => 
+                typeof item === 'object' ? (item.value || item.units || item.revenue || 0) : Number(item)
+              );
+              
+              if (chartSpec.labels.length > 0 && chartSpec.values.length > 0) {
+                const chartResult = await executeTool('generate_chart', chartSpec);
+                toolResults.push(chartResult);
+              }
+            }
+          }
+        } catch (error) {
+          console.error('[Chart Auto-Generation] Error:', error);
+        }
+      }
+    }
+
         // If tools were called, do a second LLM call to generate the final response
         // This allows the agent to call generate_chart after seeing the data
         if (toolCalls.length > 0) {
