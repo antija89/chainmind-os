@@ -79,14 +79,13 @@ export default function AgentWorkspace() {
     updateAgent.mutate({ agentId, instructionStack: lines });
   };
 
-  // Chat
-  const sendMessage = trpc.agents.sendMessage.useMutation({
+  // Chat with tools
+  const sendMessage = trpc.agentChatWithTools.sendMessage.useMutation({
     onSuccess: (data) => {
-      const content = typeof data.message === 'string' ? data.message : String(data.message);
       setMessages(prev => [...prev, {
         id: `assistant-${Date.now()}`,
         role: 'assistant',
-        content,
+        content: data.response,
         timestamp: new Date(),
         isError: !data.success,
         toolsUsed: data.toolsUsed ?? [],
@@ -109,7 +108,12 @@ export default function AgentWorkspace() {
     if (!msg || sendMessage.isPending) return;
     setMessages(prev => [...prev, { id: `user-${Date.now()}`, role: 'user', content: msg, timestamp: new Date() }]);
     setInput('');
-    sendMessage.mutate({ agentId, agentName: meta.name, message: msg });
+    sendMessage.mutate({ 
+      agentId, 
+      agentName: meta.name, 
+      message: msg,
+      conversationHistory: messages.map(m => ({ role: m.role, content: m.content })),
+    });
   };
 
   const instructionStack = Array.isArray(agentData?.instructionStack)

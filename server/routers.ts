@@ -8,6 +8,8 @@ import { z } from 'zod';
 import { nanoid } from 'nanoid';
 import { importExcelData } from './excelImport';
 import { setLLMConfig, getLLMConfig, callLLM } from './llmService';
+import { toolCreationAgentRouter } from './routers/tool-creation-agent';
+import { agentChatWithToolsRouter } from './routers/agent-chat-with-tools';
 import {
   getAgentsList, getAgentById, updateAgentInstructions,
   getPlansList, getPlanById, createPlan, updatePlanStatus,
@@ -648,6 +650,12 @@ export const appRouter = router({
       .input(z.object({ toolId: z.string() }))
       .query(({ input }) => getToolStats(input.toolId)),
   }),
+
+  // ============ TOOL CREATION AGENT ============
+  toolCreationAgent: toolCreationAgentRouter,
+
+  // ============ AGENT CHAT WITH TOOLS ============
+  agentChatWithTools: agentChatWithToolsRouter,
 
 });
 
