@@ -15,6 +15,9 @@ import AuditTrail from "./pages/AuditTrail";
 import Settings from "./pages/Settings";
 import AgentRoster from "./pages/AgentRoster";
 import AgentWorkspace from "./pages/AgentWorkspace";
+import { ToolRegistry } from "./pages/ToolRegistry";
+import { ToolCreationAgent } from "./pages/ToolCreationAgent";
+import { ToolManagement } from "./pages/ToolManagement";
 
 function Router() {
   return (
@@ -29,6 +32,8 @@ function Router() {
       <Route path="/settings" component={() => <ChainMindLayout><Settings /></ChainMindLayout>} />
       <Route path="/agents" component={() => <ChainMindLayout><AgentRoster /></ChainMindLayout>} />
       <Route path="/agents/:agentId" component={() => <ChainMindLayout><AgentWorkspace /></ChainMindLayout>} />
+      <Route path="/tools" component={() => <ChainMindLayout><ToolManagement /></ChainMindLayout>} />
+      <Route path="/tools/create-agent" component={() => <ChainMindLayout><ToolCreationAgent /></ChainMindLayout>} />
       <Route path="/404" component={NotFound} />
       <Route component={NotFound} />
     </Switch>

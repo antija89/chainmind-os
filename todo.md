@@ -146,3 +146,13 @@
 - [x] AgentWorkspace page at /agents/:agentId with Chat, Instruction Stack, Tools tabs
 - [x] Back navigation from workspace to roster
 - [x] TypeScript compiles with 0 errors
+
+## Phase 15: Tool Management System (NEW PRIORITY)
+- [ ] Create agent_tools table schema (tool registry)
+- [ ] Create tool_execution_log table schema (audit trail)
+- [ ] Build Tool Registry UI page (/tools) with view/add/edit/delete
+- [ ] Build Tool Creation Agent with natural language input form
+- [ ] Implement tool execution dispatcher (ensure LLM uses tools not direct API)
+- [ ] Add supply chain-specific tools for each agent
+- [ ] Test tool execution flow end-to-end
+- [ ] Verify LLM agents use tools correctly

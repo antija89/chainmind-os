@@ -17,6 +17,10 @@ import {
   getSalesHistoryList, getForecastList, getPoDataList, getSuppliersList,
   getDashboardKpis, saveAgentMessage, getAgentMessages,
 } from './db';
+import {
+  getToolList, getToolById, getToolsByAgent, createTool, updateTool, deleteTool,
+  logToolExecution, getToolExecutionHistory, getToolStats,
+} from './db-tools';
 
 // ============ ROLE-BASED MIDDLEWARE ============
 
@@ -536,6 +540,89 @@ export const appRouter = router({
       }))
       .query(({ input }) => getAuditLogs({ limit: input.limit, offset: input.offset, search: input.search, actorType: input.actorType })),
   }),
+  // ============ TOOL MANAGEMENT ROUTER ============
+  tools: router({
+    list: publicProcedure
+      .input(z.object({ search: z.string().optional() }))
+      .query(({ input }) => getToolList(input.search)),
+
+    getById: publicProcedure
+      .input(z.object({ toolId: z.string() }))
+      .query(({ input }) => getToolById(input.toolId)),
+
+    getByAgent: publicProcedure
+      .input(z.object({ agentId: z.string() }))
+      .query(({ input }) => getToolsByAgent(input.agentId)),
+
+    create: protectedProcedure
+      .input(z.object({
+        name: z.string(),
+        description: z.string().optional(),
+        category: z.enum(["demand", "supply", "production", "procurement", "operations"]),
+        agentIds: z.array(z.string()),
+        inputSchema: z.any(),
+        outputSchema: z.any().optional(),
+        implementation: z.string(),
+        dataSources: z.array(z.string()).optional(),
+        complexity: z.enum(["simple", "medium", "complex"]).optional(),
+      }))
+      .mutation(async ({ input, ctx }) => {
+        const tool = await createTool({ ...input, createdBy: ctx.user.openId });
+        await writeAuditLog({
+          actorId: ctx.user.openId,
+          actorType: "human",
+          action: "tool_created",
+          entityType: "tool",
+          entityId: (tool as any).tool_id,
+          description: `Created tool: ${input.name}`,
+        });
+        return tool;
+      }),
+
+    delete: adminProcedure
+      .input(z.object({ toolId: z.string() }))
+      .mutation(async ({ input, ctx }) => {
+        await deleteTool(input.toolId);
+        await writeAuditLog({
+          actorId: ctx.user.openId,
+          actorType: "human",
+          action: "tool_deleted",
+          entityType: "tool",
+          entityId: input.toolId,
+          description: `Deleted tool`,
+        });
+        return { success: true };
+      }),
+
+    logExecution: protectedProcedure
+      .input(z.object({
+        toolId: z.string(),
+        agentId: z.string().optional(),
+        messageId: z.string().optional(),
+        inputParams: z.any().optional(),
+        outputResult: z.any().optional(),
+        executionTime: z.number().optional(),
+        status: z.enum(["success", "error", "timeout"]),
+        errorMessage: z.string().optional(),
+      }))
+      .mutation(async ({ input, ctx }) => {
+        const executionId = await logToolExecution({ ...input, userId: ctx.user.id });
+        return { executionId };
+      }),
+
+    getExecutionHistory: publicProcedure
+      .input(z.object({
+        toolId: z.string().optional(),
+        agentId: z.string().optional(),
+        limit: z.number().default(100),
+      }))
+      .query(({ input }) => getToolExecutionHistory(input.toolId, input.agentId, input.limit)),
+
+    getStats: publicProcedure
+      .input(z.object({ toolId: z.string() }))
+      .query(({ input }) => getToolStats(input.toolId)),
+  }),
+
 });
 
 // ============ LLM WITH TOOLS HELPER ============

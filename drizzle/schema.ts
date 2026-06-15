@@ -333,3 +333,43 @@ export const agentMessages = mysqlTable("agent_messages", {
 
 export type AgentMessages = typeof agentMessages.$inferSelect;
 export type InsertAgentMessages = typeof agentMessages.$inferInsert;
+
+
+// ============ TOOL MANAGEMENT TABLES ============
+
+export const agentTools = mysqlTable("agent_tools", {
+  toolId: varchar("tool_id", { length: 64 }).primaryKey(),
+  name: varchar("name", { length: 256 }).notNull(),
+  description: text("description"),
+  category: mysqlEnum("category", ["demand", "supply", "production", "procurement", "operations"]).notNull(),
+  agentIds: json("agent_ids").notNull(), // Array of agent IDs that can use this tool
+  inputSchema: json("input_schema").notNull(), // JSON Schema for inputs
+  outputSchema: json("output_schema"), // JSON Schema for outputs
+  implementation: varchar("implementation", { length: 256 }).notNull(), // Server function name
+  dataSources: json("data_sources"), // Array of table names this tool queries
+  complexity: mysqlEnum("complexity", ["simple", "medium", "complex"]).default("simple"),
+  isActive: boolean("is_active").default(true),
+  createdBy: varchar("created_by", { length: 64 }),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow().onUpdateNow(),
+});
+
+export type AgentTools = typeof agentTools.$inferSelect;
+export type InsertAgentTools = typeof agentTools.$inferInsert;
+
+export const toolExecutionLog = mysqlTable("tool_execution_log", {
+  executionId: varchar("execution_id", { length: 64 }).primaryKey(),
+  toolId: varchar("tool_id", { length: 64 }).notNull(),
+  agentId: varchar("agent_id", { length: 64 }),
+  userId: int("user_id"),
+  messageId: varchar("message_id", { length: 64 }), // Reference to agent_messages
+  inputParams: json("input_params"),
+  outputResult: json("output_result"),
+  executionTime: int("execution_time"), // milliseconds
+  status: mysqlEnum("status", ["success", "error", "timeout"]).default("success"),
+  errorMessage: text("error_message"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export type ToolExecutionLog = typeof toolExecutionLog.$inferSelect;
+export type InsertToolExecutionLog = typeof toolExecutionLog.$inferInsert;
