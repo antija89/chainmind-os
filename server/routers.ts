@@ -434,7 +434,7 @@ export const appRouter = router({
           const buffer = Buffer.from(input.fileData, 'base64');
           return await importExcelData(input.tableName, buffer);
         } catch (error) {
-          return { success: false, message: `Error: ${error instanceof Error ? error.message : 'Unknown error'}`, rowsInserted: 0 };
+          return { success: false, message: `Error: ${error instanceof Error ? error.message : 'Unknown error'}`, rowsInserted: 0, rowsSkipped: 0, errors: [{ row: 0, error: error instanceof Error ? error.message : 'Unknown error' }] };
         }
       }),
   }),
