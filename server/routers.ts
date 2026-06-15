@@ -10,6 +10,7 @@ import { importExcelData } from './excelImport';
 import { setLLMConfig, getLLMConfig, callLLM } from './llmService';
 import { toolCreationAgentRouter } from './routers/tool-creation-agent';
 import { agentChatWithToolsRouter } from './routers/agent-chat-with-tools';
+import { toolGeneratorRouter } from './routers/tool-generator';
 import {
   getAgentsList, getAgentById, updateAgentInstructions,
   getPlansList, getPlanById, createPlan, updatePlanStatus,
@@ -685,6 +686,9 @@ export const appRouter = router({
 
   // ============ AGENT CHAT WITH TOOLS ============
   agentChatWithTools: agentChatWithToolsRouter,
+
+  // ============ TOOL GENERATOR (LLM-powered) ============
+  toolGenerator: toolGeneratorRouter,
 
 });
 

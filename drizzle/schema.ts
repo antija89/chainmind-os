@@ -300,8 +300,7 @@ export type HilGates = typeof hilGates.$inferSelect;
 export type InsertHilGates = typeof hilGates.$inferInsert;
 
 export const auditLog = mysqlTable("audit_log", {
-  id: int("id").autoincrement().primaryKey(),
-  logId: varchar("log_id", { length: 64 }).notNull().unique(),
+  logId: varchar("log_id", { length: 64 }).primaryKey(),
   createdAt: timestamp("created_at").defaultNow(),
   actorId: varchar("actor_id", { length: 64 }),
   actorName: varchar("actor_name", { length: 255 }),

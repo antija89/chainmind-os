@@ -75,7 +75,7 @@ export default function AuditTrail() {
           ) : (
             <div className="divide-y divide-slate-100">
               {data.map(entry => (
-                <div key={entry.id} className="flex items-start gap-4 px-4 py-3 hover:bg-slate-50 transition-colors">
+                <div key={entry.logId} className="flex items-start gap-4 px-4 py-3 hover:bg-slate-50 transition-colors">
                   <div className={`p-1.5 rounded-full mt-0.5 ${entry.actorType === 'human' ? 'bg-blue-100' : entry.actorType === 'agent' ? 'bg-violet-100' : 'bg-slate-100'}`}>
                     {entry.actorType === 'human' ? <User className="w-3.5 h-3.5 text-blue-600" /> : <Bot className="w-3.5 h-3.5 text-violet-600" />}
                   </div>
