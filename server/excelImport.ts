@@ -1,6 +1,7 @@
 import { read, utils } from 'xlsx';
 import { getDb } from './db';
 import { Buffer } from 'buffer';
+import { nanoid } from 'nanoid';
 import { fgMaster, rmMaster, bom, inventory, poData, salesHistory, forecast } from '../drizzle/schema';
 import { InsertFgMaster, InsertRmMaster, InsertBom, InsertInventory, InsertPoData, InsertSalesHistory, InsertForecast } from '../drizzle/schema';
 
@@ -151,17 +152,40 @@ export async function importExcelData(
 
       case 'sales_history':
         for (const row of data as any[]) {
+          // Support both snake_case (from database) and Title Case (from Excel)
+          const month = String(row.month || row.Month || '');
+          const fgCode = String(row.fg_code || row['FG Code'] || '');
+          const fgDescription = row.fg_description || row['FG Description'] || null;
+          const division = row.division || row.Division || null;
+          const country = row.country || row.Country || null;
+          const channel = row.channel || row.Channel || null;
+          const unitsSold = parseFloat(row.units_sold || row['Units Sold'] || 0);
+          const grossSalesAed = String(parseFloat(row.gross_sales_aed || row['Gross Sales AED'] || 0));
+          const promoDiscountPercent = parseFloat(row.promo_discount_percent || row['Promo Discount %'] || 0);
+          const netAspAed = String(parseFloat(row.net_asp_aed || row['Net ASP AED'] || 0));
+          const netSalesAed = String(parseFloat(row.net_sales_aed || row['Net Sales AED'] || 0));
+          const returnsUnits = parseFloat(row.returns_units || row['Returns Units'] || 0);
+          const fillRatePercent = parseFloat(row.fill_rate_percent || row['Fill Rate %'] || 0);
+          const tradeSpendAed = String(parseFloat(row.trade_spend_aed || row['Trade Spend AED'] || 0));
+          const sellThroughPercent = parseFloat(row.sell_through_percent || row['Sell Through %'] || 0);
+          
           const insertData: InsertSalesHistory = {
-            historyId: String(row.history_id || ''),
-            month: String(row.month || ''),
-            fgCode: String(row.fg_code || ''),
-            fgDescription: row.fg_description || null,
-            division: row.division || null,
-            country: row.country || null,
-            channel: row.channel || null,
-            unitsSold: parseInt(row.units_sold) || 0,
-            grossSalesAed: String(parseFloat(row.gross_sales_aed) || 0),
-            netSalesAed: String(parseFloat(row.net_sales_aed) || 0),
+            historyId: String(row.history_id || nanoid()),
+            month,
+            fgCode,
+            fgDescription,
+            division,
+            country,
+            channel,
+            unitsSold,
+            grossSalesAed,
+            promoDiscountPercent,
+            netAspAed,
+            netSalesAed,
+            returnsUnits,
+            fillRatePercent,
+            tradeSpendAed,
+            sellThroughPercent,
           };
           try {
             await db.insert(salesHistory).values(insertData).onDuplicateKeyUpdate({ set: insertData });

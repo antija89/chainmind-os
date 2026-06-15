@@ -83,6 +83,7 @@ type Message = {
   timestamp: Date;
   isError?: boolean;
   toolsUsed?: string[];
+  contentType?: 'text' | 'table' | 'chart' | 'image' | 'mixed';
 };
 
 export default function AgentChat() {
@@ -96,6 +97,7 @@ export default function AgentChat() {
     role: 'assistant',
     content: `Hello! I'm your **${a.name}**.\n\n${a.description}.\n\nI have access to your live supply chain data — inventory, sales history, forecasts, purchase orders, and supplier information. Ask me anything or pick a quick prompt below.`,
     timestamp: new Date(),
+    contentType: 'text',
   });
 
   const [messages, setMessages] = useState<Message[]>([makeWelcome(agent)]);
@@ -112,9 +114,24 @@ export default function AgentChat() {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
+  // Detect content type from response
+  const detectContentType = (content: string): Message['contentType'] => {
+    const hasTable = /^\s*\|.*\|.*\|/m.test(content);
+    const hasChart = /```(chart|mermaid|plotly|vega)/i.test(content);
+    const hasImage = /!\[.*?\]\(.*?\)/g.test(content);
+    
+    if (hasTable && hasChart && hasImage) return 'mixed';
+    if (hasTable) return 'table';
+    if (hasChart) return 'chart';
+    if (hasImage) return 'image';
+    return 'text';
+  };
+
   const sendMessage = trpc.agents.sendMessage.useMutation({
     onSuccess: (data) => {
       const content = typeof data.message === 'string' ? data.message : String(data.message);
+      const contentType = detectContentType(content);
+      
       setMessages(prev => [
         ...prev,
         {
@@ -124,6 +141,7 @@ export default function AgentChat() {
           timestamp: new Date(),
           isError: !data.success,
           toolsUsed: data.toolsUsed ?? [],
+          contentType,
         },
       ]);
     },
@@ -137,6 +155,7 @@ export default function AgentChat() {
           content: `⚠️ **Error:** ${err.message}\n\nPlease go to **Settings** in the sidebar and configure your LLM provider (Gemini, OpenAI, or Anthropic).`,
           timestamp: new Date(),
           isError: true,
+          contentType: 'text',
         },
       ]);
     },
@@ -148,7 +167,7 @@ export default function AgentChat() {
 
     setMessages(prev => [
       ...prev,
-      { id: `user-${Date.now()}`, role: 'user', content: msg, timestamp: new Date() },
+      { id: `user-${Date.now()}`, role: 'user', content: msg, timestamp: new Date(), contentType: 'text' },
     ]);
     setInput('');
 
@@ -192,7 +211,7 @@ export default function AgentChat() {
                   {msg.role === 'assistant' ? <Bot className="h-4 w-4" /> : <User className="h-4 w-4" />}
                 </AvatarFallback>
               </Avatar>
-              <div className={`max-w-[78%] rounded-2xl px-4 py-3 text-sm shadow-sm ${
+              <div className={`max-w-[85%] rounded-2xl px-4 py-3 text-sm shadow-sm overflow-hidden ${
                 msg.role === 'user'
                   ? 'bg-blue-600 text-white rounded-tr-sm'
                   : msg.isError
@@ -200,20 +219,52 @@ export default function AgentChat() {
                   : 'bg-white border border-gray-200 text-gray-900 rounded-tl-sm'
               }`}>
                 {msg.role === 'assistant' ? (
-                  <div className="prose prose-sm max-w-none prose-headings:text-gray-900 prose-p:text-gray-800">
+                  <div className="w-full prose prose-sm dark:prose-invert max-w-none 
+                    prose-headings:text-gray-900 prose-headings:font-bold prose-headings:mt-4 prose-headings:mb-2
+                    prose-p:text-gray-800 prose-p:my-2
+                    prose-table:border-collapse prose-table:w-full prose-table:my-4
+                    prose-td:border prose-td:border-gray-300 prose-td:px-3 prose-td:py-2 prose-td:text-left
+                    prose-th:border prose-th:border-gray-300 prose-th:px-3 prose-th:py-2 prose-th:bg-gray-100 prose-th:font-bold
+                    prose-img:max-w-full prose-img:h-auto prose-img:rounded prose-img:my-4
+                    prose-code:bg-gray-100 prose-code:px-2 prose-code:py-1 prose-code:rounded prose-code:text-red-600
+                    prose-pre:bg-gray-900 prose-pre:text-gray-100 prose-pre:p-4 prose-pre:rounded prose-pre:overflow-x-auto
+                    prose-strong:text-gray-900 prose-strong:font-bold
+                    prose-em:text-gray-700
+                    prose-a:text-blue-600 prose-a:underline
+                    prose-li:my-1
+                    prose-ul:my-2 prose-ul:pl-4
+                    prose-ol:my-2 prose-ol:pl-4
+                    prose-blockquote:border-l-4 prose-blockquote:border-gray-300 prose-blockquote:pl-4 prose-blockquote:italic
+                  ">
                     <Streamdown>{msg.content}</Streamdown>
                   </div>
                 ) : (
                   <p className="whitespace-pre-wrap leading-relaxed">{msg.content}</p>
                 )}
+                
+                {/* Content Type Badge */}
+                {msg.contentType && msg.contentType !== 'text' && msg.role === 'assistant' && (
+                  <div className="flex items-center gap-1 mt-3 pt-3 border-t border-gray-200 text-xs text-gray-500">
+                    <span>
+                      {msg.contentType === 'table' && '📊 Table'}
+                      {msg.contentType === 'chart' && '📈 Chart'}
+                      {msg.contentType === 'image' && '🖼️ Image'}
+                      {msg.contentType === 'mixed' && '🎨 Mixed Content'}
+                    </span>
+                  </div>
+                )}
+                
+                {/* Tools Used */}
                 {msg.toolsUsed && msg.toolsUsed.length > 0 && (
-                  <div className="flex flex-wrap gap-1 mt-2 pt-2 border-t border-gray-100">
+                  <div className="flex flex-wrap gap-1 mt-2 pt-2 border-t border-gray-200">
                     <Wrench className="h-3 w-3 text-gray-400 mt-0.5 shrink-0" />
                     {msg.toolsUsed.map((t) => (
                       <span key={t} className="text-xs px-1.5 py-0.5 rounded bg-gray-100 text-gray-600 font-mono">{t}</span>
                     ))}
                   </div>
                 )}
+                
+                {/* Timestamp */}
                 <p className={`text-xs mt-2 ${msg.role === 'user' ? 'text-blue-200' : 'text-gray-400'}`}>
                   {msg.timestamp.toLocaleTimeString()}
                 </p>

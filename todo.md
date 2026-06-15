@@ -223,6 +223,17 @@
 - [x] Verify dashboard displays real data from actual agent interactions
 - [x] Test complete workflow with real supervision logging
 
+## Phase 21: Rich Content Rendering in Agent Chat (COMPLETED)
+- [x] Enable table rendering with proper styling (borders, padding, alignment)
+- [x] Enable chart rendering (Mermaid, Plotly, Vega support)
+- [x] Enable image rendering with responsive sizing
+- [x] Add content type detection (text, table, chart, image, mixed)
+- [x] Add content type badges to messages
+- [x] Preserve chat history across all messages
+- [x] Add proper prose styling for markdown content
+- [x] Support code blocks with syntax highlighting
+- [x] Verify rich content displays correctly in chat window
+
 ## Phase 20: Wire Agent Chat to Reviewer Supervision (NEXT)
 - [ ] Call reviewerAgent.logAgentResponse after every agent chat response
 - [ ] Automatically trigger guidance when blank/error detected
