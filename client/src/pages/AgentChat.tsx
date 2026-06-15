@@ -9,6 +9,13 @@ import { Loader2, Send, RotateCcw, Bot, User, Wrench } from 'lucide-react';
 import { trpc } from '@/lib/trpc';
 import { toast } from 'sonner';
 import { Streamdown } from 'streamdown';
+import {
+  BarChart, Bar, LineChart, Line, PieChart, Pie, Cell,
+  AreaChart, Area, ScatterChart, Scatter,
+  XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
+} from 'recharts';
+
+// ─── Agent config ─────────────────────────────────────────────────────────────
 
 const AGENTS: Record<string, { name: string; icon: string; color: string; description: string; badge: string }> = {
   demand_planner: {
@@ -50,30 +57,141 @@ const AGENTS: Record<string, { name: string; icon: string; color: string; descri
 
 const QUICK_PROMPTS: Record<string, string[]> = {
   demand_planner: [
-    'Which is our top selling SKU?',
-    'Show me the demand forecast summary',
-    'What are the sales trends?',
+    'Show me top 5 selling SKUs as a bar chart',
+    'What is the demand forecast for next 3 months?',
+    'Which SKUs have the highest revenue?',
   ],
   supply_planner: [
     'What is our current inventory status?',
+    'Show inventory levels as a chart',
     'Which items are at risk of stockout?',
-    'Show me open purchase orders',
   ],
   production_planner: [
-    'What inventory is available for production?',
+    'Show capacity utilization as a chart',
     'Which SKUs need production scheduling?',
-    'Show me forecast vs inventory gaps',
+    'Show forecast vs inventory gaps',
   ],
   procurement_planner: [
     'List all open purchase orders',
+    'Show supplier performance as a chart',
     'Which suppliers have the longest lead times?',
-    'Show me PO value by supplier',
   ],
   ops_head: [
-    'Give me a full supply chain health summary',
+    'Show me KPI dashboard as charts',
     'What are the top risks this week?',
-    'Show me KPI performance vs targets',
+    'Give me a full supply chain health summary',
   ],
+};
+
+const CHART_COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#06b6d4', '#f97316', '#84cc16'];
+
+// ─── Chart renderer ───────────────────────────────────────────────────────────
+
+interface ChartSpec {
+  type: 'bar' | 'line' | 'pie' | 'area' | 'scatter';
+  title: string;
+  labels: string[];
+  values: number[];
+  xLabel?: string;
+  yLabel?: string;
+  dataset?: Array<{ name: string; values: number[] }>;
+  renderAs?: 'chart';
+}
+
+function InlineChart({ spec }: { spec: ChartSpec }) {
+  // Build recharts data array
+  const data = spec.labels.map((label, i) => {
+    const point: Record<string, any> = { name: label, value: spec.values?.[i] ?? 0 };
+    if (spec.dataset) {
+      spec.dataset.forEach(ds => {
+        point[ds.name] = ds.values?.[i] ?? 0;
+      });
+    }
+    return point;
+  });
+
+  const pieData = spec.labels.map((label, i) => ({
+    name: label,
+    value: spec.values?.[i] ?? 0,
+  }));
+
+  return (
+    <div className="my-4 p-4 bg-gray-50 rounded-xl border border-gray-200">
+      <h4 className="text-sm font-semibold text-gray-700 mb-3 text-center">{spec.title}</h4>
+      <ResponsiveContainer width="100%" height={260}>
+        {spec.type === 'pie' ? (
+          <PieChart>
+            <Pie data={pieData} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={100} label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}>
+              {pieData.map((_, index) => (
+                <Cell key={`cell-${index}`} fill={CHART_COLORS[index % CHART_COLORS.length]} />
+              ))}
+            </Pie>
+            <Tooltip formatter={(v: number) => v.toLocaleString()} />
+            <Legend />
+          </PieChart>
+        ) : spec.type === 'line' ? (
+          <LineChart data={data} margin={{ top: 5, right: 20, left: 0, bottom: 5 }}>
+            <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+            <XAxis dataKey="name" tick={{ fontSize: 11 }} label={spec.xLabel ? { value: spec.xLabel, position: 'insideBottom', offset: -5 } : undefined} />
+            <YAxis tick={{ fontSize: 11 }} label={spec.yLabel ? { value: spec.yLabel, angle: -90, position: 'insideLeft' } : undefined} />
+            <Tooltip formatter={(v: number) => v.toLocaleString()} />
+            <Legend />
+            {spec.dataset ? (
+              spec.dataset.map((ds, i) => (
+                <Line key={ds.name} type="monotone" dataKey={ds.name} stroke={CHART_COLORS[i % CHART_COLORS.length]} strokeWidth={2} dot={false} />
+              ))
+            ) : (
+              <Line type="monotone" dataKey="value" stroke={CHART_COLORS[0]} strokeWidth={2} dot={{ r: 4 }} />
+            )}
+          </LineChart>
+        ) : spec.type === 'area' ? (
+          <AreaChart data={data} margin={{ top: 5, right: 20, left: 0, bottom: 5 }}>
+            <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+            <XAxis dataKey="name" tick={{ fontSize: 11 }} />
+            <YAxis tick={{ fontSize: 11 }} />
+            <Tooltip formatter={(v: number) => v.toLocaleString()} />
+            <Legend />
+            {spec.dataset ? (
+              spec.dataset.map((ds, i) => (
+                <Area key={ds.name} type="monotone" dataKey={ds.name} stroke={CHART_COLORS[i % CHART_COLORS.length]} fill={CHART_COLORS[i % CHART_COLORS.length] + '33'} strokeWidth={2} />
+              ))
+            ) : (
+              <Area type="monotone" dataKey="value" stroke={CHART_COLORS[0]} fill={CHART_COLORS[0] + '33'} strokeWidth={2} />
+            )}
+          </AreaChart>
+        ) : (
+          // Default: bar chart
+          <BarChart data={data} margin={{ top: 5, right: 20, left: 0, bottom: 5 }}>
+            <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+            <XAxis dataKey="name" tick={{ fontSize: 11 }} label={spec.xLabel ? { value: spec.xLabel, position: 'insideBottom', offset: -5 } : undefined} />
+            <YAxis tick={{ fontSize: 11 }} label={spec.yLabel ? { value: spec.yLabel, angle: -90, position: 'insideLeft' } : undefined} />
+            <Tooltip formatter={(v: number) => v.toLocaleString()} />
+            <Legend />
+            {spec.dataset ? (
+              spec.dataset.map((ds, i) => (
+                <Bar key={ds.name} dataKey={ds.name} fill={CHART_COLORS[i % CHART_COLORS.length]} radius={[4, 4, 0, 0]} />
+              ))
+            ) : (
+              <Bar dataKey="value" fill={CHART_COLORS[0]} radius={[4, 4, 0, 0]}>
+                {data.map((_, index) => (
+                  <Cell key={`cell-${index}`} fill={CHART_COLORS[index % CHART_COLORS.length]} />
+                ))}
+              </Bar>
+            )}
+          </BarChart>
+        )}
+      </ResponsiveContainer>
+    </div>
+  );
+}
+
+// ─── Types ────────────────────────────────────────────────────────────────────
+
+type ToolResult = {
+  toolName: string;
+  status: string;
+  result: any;
+  executionTime?: number;
 };
 
 type Message = {
@@ -83,8 +201,11 @@ type Message = {
   timestamp: Date;
   isError?: boolean;
   toolsUsed?: string[];
-  contentType?: 'text' | 'table' | 'chart' | 'image' | 'mixed';
+  toolResults?: ToolResult[];
+  chartSpecs?: ChartSpec[];
 };
+
+// ─── Main component ───────────────────────────────────────────────────────────
 
 export default function AgentChat() {
   const [, params] = useRoute('/agent/:agentId');
@@ -95,15 +216,15 @@ export default function AgentChat() {
   const makeWelcome = (a: typeof agent): Message => ({
     id: 'welcome',
     role: 'assistant',
-    content: `Hello! I'm your **${a.name}**.\n\n${a.description}.\n\nI have access to your live supply chain data — inventory, sales history, forecasts, purchase orders, and supplier information. Ask me anything or pick a quick prompt below.`,
+    content: `Hello! I'm your **${a.name}**.\n\n${a.description}.\n\nI have access to your live supply chain data — inventory, sales history, forecasts, purchase orders, and supplier information. I can also **generate charts and visualizations** for you. Ask me anything or pick a quick prompt below.`,
     timestamp: new Date(),
-    contentType: 'text',
   });
 
   const [messages, setMessages] = useState<Message[]>([makeWelcome(agent)]);
   const [input, setInput] = useState('');
   const bottomRef = useRef<HTMLDivElement>(null);
 
+  // Reset on agent change
   useEffect(() => {
     setMessages([makeWelcome(agent)]);
     setInput('');
@@ -114,24 +235,23 @@ export default function AgentChat() {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
-  // Detect content type from response
-  const detectContentType = (content: string): Message['contentType'] => {
-    const hasTable = /^\s*\|.*\|.*\|/m.test(content);
-    const hasChart = /```(chart|mermaid|plotly|vega)/i.test(content);
-    const hasImage = /!\[.*?\]\(.*?\)/g.test(content);
-    
-    if (hasTable && hasChart && hasImage) return 'mixed';
-    if (hasTable) return 'table';
-    if (hasChart) return 'chart';
-    if (hasImage) return 'image';
-    return 'text';
+  // Extract chart specs from tool results
+  const extractChartSpecs = (toolResults: ToolResult[]): ChartSpec[] => {
+    const specs: ChartSpec[] = [];
+    for (const tr of toolResults) {
+      if (tr.result?.chartSpec?.renderAs === 'chart') {
+        specs.push(tr.result.chartSpec as ChartSpec);
+      }
+    }
+    return specs;
   };
 
-  const sendMessage = trpc.agents.sendMessage.useMutation({
+  const sendMessage = trpc.agentChatWithTools.sendMessage.useMutation({
     onSuccess: (data) => {
-      const content = typeof data.message === 'string' ? data.message : String(data.message);
-      const contentType = detectContentType(content);
-      
+      const content = typeof data.response === 'string' ? data.response : String(data.response ?? '');
+      const toolResults = (data.toolResults ?? []) as ToolResult[];
+      const chartSpecs = extractChartSpecs(toolResults);
+
       setMessages(prev => [
         ...prev,
         {
@@ -141,21 +261,21 @@ export default function AgentChat() {
           timestamp: new Date(),
           isError: !data.success,
           toolsUsed: data.toolsUsed ?? [],
-          contentType,
+          toolResults,
+          chartSpecs,
         },
       ]);
     },
     onError: (err) => {
-      toast.error('Failed to get response. Check Settings → LLM configuration.');
+      toast.error('Failed to get response from agent.');
       setMessages(prev => [
         ...prev,
         {
           id: `error-${Date.now()}`,
           role: 'assistant',
-          content: `⚠️ **Error:** ${err.message}\n\nPlease go to **Settings** in the sidebar and configure your LLM provider (Gemini, OpenAI, or Anthropic).`,
+          content: `⚠️ **Error:** ${err.message}\n\nPlease try again or check the server logs.`,
           timestamp: new Date(),
           isError: true,
-          contentType: 'text',
         },
       ]);
     },
@@ -165,13 +285,23 @@ export default function AgentChat() {
     const msg = (text ?? input).trim();
     if (!msg || sendMessage.isPending) return;
 
+    // Build conversation history for context (exclude welcome message)
+    const history = messages
+      .filter(m => m.id !== 'welcome')
+      .map(m => ({ role: m.role, content: m.content }));
+
     setMessages(prev => [
       ...prev,
-      { id: `user-${Date.now()}`, role: 'user', content: msg, timestamp: new Date(), contentType: 'text' },
+      { id: `user-${Date.now()}`, role: 'user', content: msg, timestamp: new Date() },
     ]);
     setInput('');
 
-    sendMessage.mutate({ agentId, agentName: agent.name, message: msg });
+    sendMessage.mutate({
+      agentId,
+      agentName: agent.name,
+      message: msg,
+      conversationHistory: history,
+    });
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -219,7 +349,7 @@ export default function AgentChat() {
                   : 'bg-white border border-gray-200 text-gray-900 rounded-tl-sm'
               }`}>
                 {msg.role === 'assistant' ? (
-                  <div className="w-full prose prose-sm dark:prose-invert max-w-none 
+                  <div className="w-full prose prose-sm dark:prose-invert max-w-none
                     prose-headings:text-gray-900 prose-headings:font-bold prose-headings:mt-4 prose-headings:mb-2
                     prose-p:text-gray-800 prose-p:my-2
                     prose-table:border-collapse prose-table:w-full prose-table:my-4
@@ -229,31 +359,24 @@ export default function AgentChat() {
                     prose-code:bg-gray-100 prose-code:px-2 prose-code:py-1 prose-code:rounded prose-code:text-red-600
                     prose-pre:bg-gray-900 prose-pre:text-gray-100 prose-pre:p-4 prose-pre:rounded prose-pre:overflow-x-auto
                     prose-strong:text-gray-900 prose-strong:font-bold
-                    prose-em:text-gray-700
                     prose-a:text-blue-600 prose-a:underline
-                    prose-li:my-1
-                    prose-ul:my-2 prose-ul:pl-4
-                    prose-ol:my-2 prose-ol:pl-4
-                    prose-blockquote:border-l-4 prose-blockquote:border-gray-300 prose-blockquote:pl-4 prose-blockquote:italic
+                    prose-li:my-1 prose-ul:my-2 prose-ul:pl-4 prose-ol:my-2 prose-ol:pl-4
                   ">
                     <Streamdown>{msg.content}</Streamdown>
                   </div>
                 ) : (
                   <p className="whitespace-pre-wrap leading-relaxed">{msg.content}</p>
                 )}
-                
-                {/* Content Type Badge */}
-                {msg.contentType && msg.contentType !== 'text' && msg.role === 'assistant' && (
-                  <div className="flex items-center gap-1 mt-3 pt-3 border-t border-gray-200 text-xs text-gray-500">
-                    <span>
-                      {msg.contentType === 'table' && '📊 Table'}
-                      {msg.contentType === 'chart' && '📈 Chart'}
-                      {msg.contentType === 'image' && '🖼️ Image'}
-                      {msg.contentType === 'mixed' && '🎨 Mixed Content'}
-                    </span>
+
+                {/* Inline Charts */}
+                {msg.chartSpecs && msg.chartSpecs.length > 0 && (
+                  <div className="mt-2 space-y-2">
+                    {msg.chartSpecs.map((spec, i) => (
+                      <InlineChart key={i} spec={spec} />
+                    ))}
                   </div>
                 )}
-                
+
                 {/* Tools Used */}
                 {msg.toolsUsed && msg.toolsUsed.length > 0 && (
                   <div className="flex flex-wrap gap-1 mt-2 pt-2 border-t border-gray-200">
@@ -263,7 +386,7 @@ export default function AgentChat() {
                     ))}
                   </div>
                 )}
-                
+
                 {/* Timestamp */}
                 <p className={`text-xs mt-2 ${msg.role === 'user' ? 'text-blue-200' : 'text-gray-400'}`}>
                   {msg.timestamp.toLocaleTimeString()}
@@ -311,7 +434,7 @@ export default function AgentChat() {
           value={input}
           onChange={(e) => setInput(e.target.value)}
           onKeyDown={handleKeyDown}
-          placeholder={`Ask ${agent.name} anything about your supply chain…`}
+          placeholder={`Ask ${agent.name} anything… e.g. "Show top SKUs as a bar chart"`}
           className="resize-none min-h-[56px] max-h-[120px]"
           rows={2}
           disabled={sendMessage.isPending}
@@ -325,7 +448,7 @@ export default function AgentChat() {
         </Button>
       </div>
       <p className="text-xs text-muted-foreground mt-1.5 text-center shrink-0">
-        Enter to send · Shift+Enter for new line · Responses grounded in your live data
+        Enter to send · Shift+Enter for new line · Charts, tables, and live data supported
       </p>
     </div>
   );

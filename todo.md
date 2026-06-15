@@ -249,6 +249,15 @@
 - [ ] Execute tool and return result to agent
 - [ ] Log tool creation event in audit trail
 
+## Phase 22: Critical Fixes (IN PROGRESS)
+- [ ] Fix agent-chat-with-tools to load and execute DB tools dynamically
+- [ ] Add generate_chart built-in tool to all agents
+- [ ] Use tool_choice: 'auto' to prevent agent refusals
+- [ ] Do second LLM call after tool results to generate final response
+- [ ] Fix Reviewer Agent to capture real agent chat interactions
+- [ ] Fix Audit Trail to log all agent conversations, prompts, and tool calls
+- [ ] Verify all 4 fixes work end-to-end
+
 ## Phase 20: S&OP Workflow Engine
 - [ ] Design S&OP workflow state machine
 - [ ] Implement demand planning phase
