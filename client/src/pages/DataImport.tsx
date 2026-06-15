@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Progress } from '@/components/ui/progress';
 import { Upload, CheckCircle, AlertCircle, Loader2 } from 'lucide-react';
 import { trpc } from '@/lib/trpc';
 
@@ -17,6 +18,7 @@ export default function DataImport() {
   const [file, setFile] = useState<File | null>(null);
   const [selectedTable, setSelectedTable] = useState<string>('fg_master');
   const [uploading, setUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
   const [result, setResult] = useState<ImportResult | null>(null);
 
   const importMutation = trpc.data.importExcel.useMutation();
@@ -36,6 +38,7 @@ export default function DataImport() {
     if (selectedFile) {
       setFile(selectedFile);
       setResult(null);
+      setUploadProgress(0);
     }
   };
 
@@ -46,21 +49,38 @@ export default function DataImport() {
     }
 
     setUploading(true);
+    setUploadProgress(0);
     const reader = new FileReader();
+
+    // Track file reading progress
+    reader.onprogress = (event) => {
+      if (event.lengthComputable) {
+        // File reading is 30% of total progress
+        const progress = (event.loaded / event.total) * 30;
+        setUploadProgress(progress);
+      }
+    };
+
     reader.onload = async (event) => {
       try {
+        setUploadProgress(30); // File read complete
+        
         const data = event.target?.result as ArrayBuffer;
         // Use browser-native Uint8Array → base64 (no Node Buffer needed)
         const bytes = new Uint8Array(data);
         let binary = '';
         for (let i = 0; i < bytes.byteLength; i++) binary += String.fromCharCode(bytes[i]);
         const base64 = btoa(binary);
+
+        setUploadProgress(50); // Base64 encoding complete
         
         const response = await importMutation.mutateAsync({
           tableName: selectedTable,
           fileData: base64,
           fileName: file.name,
         });
+
+        setUploadProgress(100); // Upload complete
 
         setResult({
           success: response.success,
@@ -78,10 +98,21 @@ export default function DataImport() {
           success: false,
           message: `Error: ${error instanceof Error ? error.message : 'Unknown error'}`,
         });
+        setUploadProgress(0);
       } finally {
         setUploading(false);
       }
     };
+
+    reader.onerror = () => {
+      setResult({
+        success: false,
+        message: 'Error reading file. Please try again.',
+      });
+      setUploading(false);
+      setUploadProgress(0);
+    };
+
     reader.readAsArrayBuffer(file);
   };
 
@@ -105,6 +136,7 @@ export default function DataImport() {
               value={selectedTable}
               onChange={(e) => setSelectedTable(e.target.value)}
               className="w-full px-3 py-2 border border-input rounded-md bg-background"
+              disabled={uploading}
             >
               {tables.map((table) => (
                 <option key={table.value} value={table.value}>
@@ -117,8 +149,10 @@ export default function DataImport() {
           {/* File Upload */}
           <div>
             <label className="block text-sm font-medium mb-2">Select File</label>
-            <div className="border-2 border-dashed border-border rounded-lg p-6 text-center hover:border-primary transition-colors cursor-pointer"
-              onClick={() => document.getElementById('file-input')?.click()}
+            <div 
+              className="border-2 border-dashed border-border rounded-lg p-6 text-center hover:border-primary transition-colors cursor-pointer"
+              onClick={() => !uploading && document.getElementById('file-input')?.click()}
+              style={{ opacity: uploading ? 0.5 : 1, pointerEvents: uploading ? 'none' : 'auto' }}
             >
               <Upload className="mx-auto h-8 w-8 text-muted-foreground mb-2" />
               <p className="text-sm font-medium">{file?.name || 'Click to select or drag file here'}</p>
@@ -129,9 +163,21 @@ export default function DataImport() {
                 accept=".xlsx,.xls"
                 onChange={handleFileChange}
                 className="hidden"
+                disabled={uploading}
               />
             </div>
           </div>
+
+          {/* Progress Bar */}
+          {uploading && (
+            <div className="space-y-2">
+              <div className="flex justify-between items-center">
+                <span className="text-sm font-medium">Uploading...</span>
+                <span className="text-sm text-muted-foreground">{Math.round(uploadProgress)}%</span>
+              </div>
+              <Progress value={uploadProgress} className="h-2" />
+            </div>
+          )}
 
           {/* Upload Button */}
           <Button
@@ -143,7 +189,7 @@ export default function DataImport() {
             {uploading ? (
               <>
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Uploading...
+                Uploading... {Math.round(uploadProgress)}%
               </>
             ) : (
               <>
