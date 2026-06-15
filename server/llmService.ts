@@ -83,11 +83,10 @@ async function callGeminiLLM(
     systemInstruction: systemPrompt ? { parts: [{ text: systemPrompt }] } : undefined,
   };
 
-  const response = await fetch(url, {
+  const urlWithKey = `${url}?key=${config.apiKey}`;
+  const response = await fetch(urlWithKey, {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
+    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(requestBody),
   });
 

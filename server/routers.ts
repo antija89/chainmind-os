@@ -8,7 +8,8 @@ import { z } from 'zod';
 import { invokeLLM } from "./_core/llm";
 import { TRPCError } from '@trpc/server';
 import { importExcelData } from './excelImport';
-import { setLLMConfig, getLLMConfig } from './llmService';
+import { setLLMConfig, getLLMConfig, callLLM } from './llmService';
+import { gatherAgentContext } from './tools';
 
 // Role-based access control middleware
 export const adminProcedure = protectedProcedure.use(({ ctx, next }) => {
@@ -69,34 +70,37 @@ export const appRouter = router({
         conversationId: z.string().optional(),
       }))
       .mutation(async ({ input }) => {
-        const systemPrompts: Record<string, string> = {
-          'Demand Planner': 'You are a Demand Planning expert. Analyze sales trends, forecast demand, and provide insights on market opportunities. Be concise and actionable.',
-          'Supply Planner': 'You are a Supply Planning expert. Optimize inventory levels, manage supplier relationships, and ensure supply chain efficiency. Be concise and actionable.',
-          'Production Planner': 'You are a Production Planning expert. Schedule production runs, optimize capacity, and minimize lead times. Be concise and actionable.',
-          'Procurement Planner': 'You are a Procurement expert. Manage purchase orders, negotiate with suppliers, and optimize procurement costs. Be concise and actionable.',
-          'Ops Head': 'You are an Operations Head. Oversee end-to-end supply chain, manage KPIs, and drive operational excellence. Be concise and actionable.',
+        const SYSTEM_PROMPTS: Record<string, string> = {
+          'Demand Planner': 'You are a senior Demand Planning expert at a consumer goods company. You have access to real supply chain data provided below. Answer questions using ONLY the data provided — never make up numbers. Be specific, concise, and actionable. Format your answers with bullet points or tables where helpful.',
+          'Supply Planner': 'You are a senior Supply Planning expert. You have access to real inventory, PO, and supply data provided below. Answer questions using ONLY the data provided — never make up numbers. Be specific, concise, and actionable.',
+          'Production Planner': 'You are a senior Production Planning expert. You have access to real inventory and forecast data provided below. Answer questions using ONLY the data provided — never make up numbers. Be specific, concise, and actionable.',
+          'Procurement Planner': 'You are a senior Procurement expert. You have access to real PO and supplier data provided below. Answer questions using ONLY the data provided — never make up numbers. Be specific, concise, and actionable.',
+          'Ops Head': 'You are the Operations Head overseeing the full supply chain. You have access to real supply chain data provided below. Answer questions using ONLY the data provided — never make up numbers. Provide executive-level insights with clear priorities.',
         };
-        
+
         try {
-          const response = await invokeLLM({
-            messages: [
-              { role: 'system', content: systemPrompts[input.agentName] || 'You are a supply chain planning assistant.' },
-              { role: 'user', content: input.message },
-            ],
-          });
-          
-          const assistantMessage = response.choices[0]?.message?.content || 'Unable to generate response';
+          // 1. Gather live data context from DB (deterministic tools — no LLM involved)
+          const dataContext = await gatherAgentContext(input.agentName);
+          const systemPrompt = (SYSTEM_PROMPTS[input.agentName] ?? SYSTEM_PROMPTS['Ops Head']) +
+            (dataContext ? `\n\n--- LIVE SUPPLY CHAIN DATA ---\n${dataContext}\n--- END OF DATA ---` : '');
+
+          // 2. Call LLM with context (LLM only does reasoning & language, not calculation)
+          const reply = await callLLM(
+            [{ role: 'user', content: input.message }],
+            systemPrompt
+          );
+
           return {
             success: true,
-            message: assistantMessage,
+            message: reply,
             conversationId: input.conversationId || `conv-${Date.now()}`,
           };
         } catch (error) {
-          console.error('LLM error:', error);
+          console.error('[Agent] sendMessage error:', error);
           return {
             success: false,
-            message: 'Error generating response. Please try again.',
-            error: String(error),
+            message: `Error: ${error instanceof Error ? error.message : String(error)}. Please check your LLM settings.`,
+            conversationId: input.conversationId || `conv-${Date.now()}`,
           };
         }
       }),
