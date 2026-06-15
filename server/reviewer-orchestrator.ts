@@ -421,26 +421,27 @@ export async function getInterAgentConversations(params: {
   const db = await getDb();
   if (!db) return [];
   try {
-    let query = db.select().from(reviewerConversations);
+    let baseQuery = db
+      .select()
+      .from(reviewerConversations)
+      .orderBy(desc(reviewerConversations.createdAt))
+      .limit(params.limit || 50);
 
+    let rows;
     if (params.agentId) {
-      (query as any).where(
+      rows = await (baseQuery as any).where(
         or(
           eq(reviewerConversations.fromAgent, params.agentId),
           eq(reviewerConversations.toAgent, params.agentId)
         )
       );
     } else if (params.sessionId) {
-      (query as any).where(eq(reviewerConversations.sessionId, params.sessionId));
+      rows = await (baseQuery as any).where(eq(reviewerConversations.sessionId, params.sessionId));
+    } else {
+      rows = await baseQuery;
     }
 
-    const rows = await db
-      .select()
-      .from(reviewerConversations)
-      .orderBy(desc(reviewerConversations.createdAt))
-      .limit(params.limit || 50);
-
-    return rows.map(row => ({
+    return (rows as typeof reviewerConversations.$inferSelect[]).map(row => ({
       conversationId: row.conversationId,
       sessionId: row.sessionId,
       supervisionId: row.supervisionId ?? undefined,

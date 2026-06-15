@@ -439,3 +439,28 @@ export const reviewerConversations = mysqlTable("reviewer_conversations", {
 });
 export type ReviewerConversation = typeof reviewerConversations.$inferSelect;
 export type InsertReviewerConversation = typeof reviewerConversations.$inferInsert;
+
+export const llmCallLogs = mysqlTable("llm_call_logs", {
+  id: varchar("id", { length: 64 }).primaryKey(),
+  agentId: varchar("agent_id", { length: 128 }).notNull(),
+  agentName: varchar("agent_name", { length: 128 }).notNull(),
+  sessionId: varchar("session_id", { length: 64 }),
+  callType: mysqlEnum("call_type", ["primary", "followup", "retry", "reviewer"]).notNull().default("primary"),
+  model: varchar("model", { length: 128 }),
+  apiUrl: varchar("api_url", { length: 512 }),
+  inputMessages: json("input_messages").notNull(),
+  inputTools: json("input_tools"),
+  toolChoice: varchar("tool_choice", { length: 32 }),
+  outputContent: text("output_content"),
+  outputToolCalls: json("output_tool_calls"),
+  finishReason: varchar("finish_reason", { length: 32 }),
+  promptTokens: int("prompt_tokens"),
+  completionTokens: int("completion_tokens"),
+  totalTokens: int("total_tokens"),
+  durationMs: int("duration_ms"),
+  status: mysqlEnum("status", ["success", "error", "empty"]).notNull().default("success"),
+  errorMessage: text("error_message"),
+  createdAt: timestamp("createdAt").defaultNow(),
+});
+export type LlmCallLog = typeof llmCallLogs.$inferSelect;
+export type InsertLlmCallLog = typeof llmCallLogs.$inferInsert;

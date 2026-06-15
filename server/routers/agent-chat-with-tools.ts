@@ -5,6 +5,7 @@ import { getToolsByAgent, logToolExecution } from '../db-tools';
 import { saveAgentMessage, getAgentMessages, writeAuditLog } from '../db';
 import { logSupervisionEvent } from '../db-supervision';
 import { orchestrateWithReviewer } from '../reviewer-orchestrator';
+import { saveLlmCallLog } from '../db-llm-logs';
 import { getDb } from '../db';
 import { salesHistory, inventory, forecast, fgMaster } from '../../drizzle/schema';
 import { desc, sql, eq } from 'drizzle-orm';
@@ -447,14 +448,28 @@ export const agentChatWithToolsRouter = router({
         ];
 
         // First LLM call — let model decide which tools to call (tool_choice: 'auto')
-        const response = await invokeLLM({
-          messages: [
-            { role: 'system', content: systemPrompt },
-            ...allMessages,
-          ],
-          tools: toolDefinitions,
-          tool_choice: 'auto',
-        });
+        const primaryMessages = [
+          { role: 'system' as const, content: systemPrompt },
+          ...allMessages,
+        ];
+        const primaryStart = Date.now();
+        let response: Awaited<ReturnType<typeof invokeLLM>>;
+        try {
+          response = await invokeLLM({
+            messages: primaryMessages,
+            tools: toolDefinitions,
+            tool_choice: 'auto',
+          });
+        } catch (llmErr: any) {
+          await saveLlmCallLog({
+            agentId: input.agentId, agentName: input.agentName, sessionId: messageId,
+            callType: 'primary', apiUrl: process.env.BUILT_IN_FORGE_API_URL,
+            inputMessages: primaryMessages, inputTools: toolDefinitions, toolChoice: 'auto',
+            durationMs: Date.now() - primaryStart, status: 'error', errorMessage: llmErr.message,
+          }).catch(() => {});
+          throw llmErr;
+        }
+        const primaryDuration = Date.now() - primaryStart;
 
         const choice = response?.choices?.[0];
         const llmMessage = choice?.message;
@@ -463,11 +478,29 @@ export const agentChatWithToolsRouter = router({
 
         console.log(`[Agent Chat] LLM response — content: ${assistantContent.length} chars, tool calls: ${toolCalls.length}`);
 
+        // Log primary LLM call
+        saveLlmCallLog({
+          agentId: input.agentId, agentName: input.agentName, sessionId: messageId,
+          callType: 'primary', model: response?.model, apiUrl: process.env.BUILT_IN_FORGE_API_URL,
+          inputMessages: primaryMessages, inputTools: toolDefinitions, toolChoice: 'auto',
+          outputContent: assistantContent, outputToolCalls: toolCalls,
+          finishReason: choice?.finish_reason ?? undefined,
+          promptTokens: response?.usage?.prompt_tokens, completionTokens: response?.usage?.completion_tokens,
+          totalTokens: response?.usage?.total_tokens, durationMs: primaryDuration,
+          status: assistantContent || toolCalls.length > 0 ? 'success' : 'empty',
+        }).catch(() => {});
+
         // Execute tool calls
         const toolResults: ToolResult[] = [];
         const toolResultMessages: any[] = [];
 
-        for (const toolCall of toolCalls) {
+        // Normalise tool calls: generate a stable id if the API omits it (uses index only)
+        const normalisedToolCalls = toolCalls.map((tc: any, idx: number) => ({
+          ...tc,
+          id: tc.id || `call_${nanoid(8)}_${idx}`,
+        }));
+
+        for (const toolCall of normalisedToolCalls) {
           const toolName = toolCall.function?.name || '';
           try {
             const toolArgs = JSON.parse(toolCall.function?.arguments || '{}');
@@ -551,25 +584,47 @@ export const agentChatWithToolsRouter = router({
 
         // If tools were called, do a second LLM call to generate the final response
         // This allows the agent to call generate_chart after seeing the data
-        if (toolCalls.length > 0) {
+        if (normalisedToolCalls.length > 0) {
+          const followUpMessages = [
+            { role: 'system' as const, content: systemPrompt },
+            ...allMessages,
+            {
+              role: 'assistant' as const,
+              // Use empty string, NOT null — Gemini rejects null content silently
+              content: assistantContent || '',
+              tool_calls: normalisedToolCalls,
+            },
+            ...toolResultMessages,
+          ];
+          const followUpStart = Date.now();
           const followUpResponse = await invokeLLM({
-            messages: [
-              { role: 'system', content: systemPrompt },
-              ...allMessages,
-              {
-                role: 'assistant',
-                content: assistantContent || null,
-                tool_calls: toolCalls,
-              },
-              ...toolResultMessages,
-            ],
+            messages: followUpMessages,
             tools: toolDefinitions,
             tool_choice: 'auto',
           });
+          const followUpDuration = Date.now() - followUpStart;
           const followUpChoice = followUpResponse?.choices?.[0];
           const followUpMessage = followUpChoice?.message;
-          const followUpContent = typeof followUpMessage?.content === 'string' ? followUpMessage.content : '';
+          // Handle both string and array content (Gemini sometimes returns array)
+          const rawFollowUpContent = followUpMessage?.content;
+          const followUpContent = typeof rawFollowUpContent === 'string'
+            ? rawFollowUpContent
+            : Array.isArray(rawFollowUpContent)
+              ? rawFollowUpContent.map((c: any) => c.text || c.content || '').join('')
+              : '';
           const followUpToolCalls = followUpMessage?.tool_calls || [];
+
+          // Log follow-up LLM call
+          saveLlmCallLog({
+            agentId: input.agentId, agentName: input.agentName, sessionId: messageId,
+            callType: 'followup', model: followUpResponse?.model, apiUrl: process.env.BUILT_IN_FORGE_API_URL,
+            inputMessages: followUpMessages, inputTools: toolDefinitions, toolChoice: 'auto',
+            outputContent: followUpContent, outputToolCalls: followUpToolCalls,
+            finishReason: followUpChoice?.finish_reason ?? undefined,
+            promptTokens: followUpResponse?.usage?.prompt_tokens, completionTokens: followUpResponse?.usage?.completion_tokens,
+            totalTokens: followUpResponse?.usage?.total_tokens, durationMs: followUpDuration,
+            status: followUpContent || followUpToolCalls.length > 0 ? 'success' : 'empty',
+          }).catch(() => {});
           
           // Execute any new tool calls from the follow-up response (e.g., generate_chart)
           for (const toolCall of followUpToolCalls) {

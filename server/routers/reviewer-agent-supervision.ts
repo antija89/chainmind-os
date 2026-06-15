@@ -11,6 +11,7 @@ import {
   getSupervisionDashboardSummary,
 } from '../db-supervision';
 import { getInterAgentConversations, getReviewerStats } from '../reviewer-orchestrator';
+import { getLlmCallLogs, getLlmCallLogById, getLlmCallLogStats } from '../db-llm-logs';
 
 /**
  * Reviewer Agent Supervision Router
@@ -272,6 +273,39 @@ export const reviewerAgentSupervisionRouter = {
     } catch (error) {
       console.error('[Reviewer Agent] Error fetching reviewer stats:', error);
       return { totalReviews: 0, interventions: 0, toolRequests: 0, resolutions: 0, avgScore: 0 };
+    }
+  }),
+
+  getLlmLogs: protectedProcedure
+    .input(z.object({
+      agentId: z.string().optional(),
+      limit: z.number().optional().default(50),
+      offset: z.number().optional().default(0),
+    }))
+    .query(async ({ input }) => {
+      try {
+        return await getLlmCallLogs({ agentId: input.agentId, limit: input.limit, offset: input.offset });
+      } catch (error) {
+        console.error('[LLM Logs] Error fetching logs:', error);
+        return [];
+      }
+    }),
+
+  getLlmLogById: protectedProcedure
+    .input(z.object({ id: z.string() }))
+    .query(async ({ input }) => {
+      try {
+        return await getLlmCallLogById(input.id);
+      } catch {
+        return null;
+      }
+    }),
+
+  getLlmLogStats: protectedProcedure.query(async () => {
+    try {
+      return await getLlmCallLogStats();
+    } catch {
+      return { total: 0, successCount: 0, errorCount: 0, emptyCount: 0, avgDuration: 0, totalTokens: 0, modelCounts: {} as Record<string, number> };
     }
   }),
 };

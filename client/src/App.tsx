@@ -19,6 +19,7 @@ import { ToolRegistry } from "./pages/ToolRegistry";
 import { ToolCreationAgent } from "./pages/ToolCreationAgent";
 import { ToolManagement } from "./pages/ToolManagement";
 import ReviewerAgentDashboard from "./pages/ReviewerAgentDashboard";
+import LlmLogs from "./pages/LlmLogs";
 
 function Router() {
   return (
@@ -36,6 +37,7 @@ function Router() {
       <Route path="/tools" component={() => <ChainMindLayout><ToolManagement /></ChainMindLayout>} />
       <Route path="/tools/create-agent" component={() => <ChainMindLayout><ToolCreationAgent /></ChainMindLayout>} />
       <Route path="/reviewer" component={() => <ChainMindLayout><ReviewerAgentDashboard /></ChainMindLayout>} />
+      <Route path="/llm-logs" component={() => <ChainMindLayout><LlmLogs /></ChainMindLayout>} />
       <Route path="/404" component={NotFound} />
       <Route component={NotFound} />
     </Switch>

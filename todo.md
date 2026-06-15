@@ -323,3 +323,17 @@
 - [x] Add "Loading history..." indicator in chat header
 - [x] Set global vitest testTimeout to 15000ms to fix flaky DB tests
 - [x] All 28 tests passing (1 skipped)
+
+## Phase 28: LLM Response Fix + LLM API Logs (COMPLETED)
+- [x] Diagnosed root cause: Gemini returns content=undefined when calling tools; follow-up message sent content=null which Gemini rejects silently
+- [x] Fixed: assistant message in follow-up now uses content='' (empty string) instead of content=null
+- [x] Fixed: handle array content from Gemini in follow-up response parsing
+- [x] Fixed: reviewer_conversations.createdAt column name mismatch (DB had created_at, schema expected createdAt)
+- [x] Fixed: llm_call_logs.createdAt column name mismatch
+- [x] Created llm_call_logs table in DB with all required columns
+- [x] Built db-llm-logs.ts with saveLlmCallLog and getLlmCallLogs helpers
+- [x] Wired LLM call logging into agent-chat-with-tools.ts (primary + follow-up calls)
+- [x] Added getLlmLogs, getLlmLogById, getLlmLogStats procedures to reviewer-agent-supervision router
+- [x] Built LLM API Logs page (/llm-logs) showing full input/output, model, API URL, tokens, duration
+- [x] Added LLM API Logs to sidebar navigation
+- [x] All 28 tests passing (1 skipped)
