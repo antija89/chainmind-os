@@ -1,126 +1,187 @@
-import { useState } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { Search, Download } from "lucide-react";
+import { useState } from 'react';
+import { trpc } from '@/lib/trpc';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Input } from '@/components/ui/input';
+import { Badge } from '@/components/ui/badge';
+import { Skeleton } from '@/components/ui/skeleton';
+import { Search, Package, Box, Layers, BarChart2, TrendingUp, ShoppingCart, Truck, Database } from 'lucide-react';
 
-export default function DataTables() {
-  const [searchTerm, setSearchTerm] = useState("");
-  const [activeTab, setActiveTab] = useState("fg-master");
+function TableSkeleton() {
+  return (
+    <div className="space-y-2">
+      {Array.from({ length: 5 }).map((_, i) => (
+        <Skeleton key={i} className="h-10 w-full" />
+      ))}
+    </div>
+  );
+}
 
-  const fgMasterData = [
-    { sku: "PCP-0105", description: "Premium Care Pack 105ml", division: "Personal Care", category: "Shampoo", active: true, price: 45.5 },
-    { sku: "AO-250", description: "Argan Oil 250ml", division: "Beauty", category: "Hair Oil", active: true, price: 125.0 },
-    { sku: "HC-500", description: "Hair Conditioner 500ml", division: "Personal Care", category: "Conditioner", active: true, price: 65.0 },
-  ];
-
-  const rmMasterData = [
-    { material: "RM-001", description: "Argan Oil Extract", category: "Raw Material", supplier: "AlRawabi", leadTime: 14, cost: 85.5 },
-    { material: "RM-002", description: "Shea Butter", category: "Raw Material", supplier: "Supplier B", leadTime: 21, cost: 45.0 },
-    { material: "RM-003", description: "Packaging Film", category: "Packaging", supplier: "Supplier C", leadTime: 7, cost: 12.5 },
-  ];
-
-  const inventoryData = [
-    { item: "PCP-0105", location: "Dubai", qty: 5200, dos: 26, status: "Normal" },
-    { item: "AO-250", location: "Abu Dhabi", qty: 1850, dos: 18, status: "Low" },
-    { item: "HC-500", location: "Dubai", qty: 3400, dos: 34, status: "High" },
-  ];
-
-  const poData = [
-    { po: "PO-2024-001", item: "RM-001", supplier: "AlRawabi", qty: 5000, value: 84500, status: "Pending", eta: "2024-07-15" },
-    { po: "PO-2024-002", item: "RM-002", supplier: "Supplier B", qty: 2000, value: 45000, status: "Confirmed", eta: "2024-07-20" },
-    { po: "PO-2024-003", item: "RM-003", supplier: "Supplier C", qty: 10000, value: 28500, status: "Shipped", eta: "2024-07-10" },
-  ];
-
-  const renderTable = (data: any[], columns: string[]) => (
-    <div className="overflow-x-auto">
+function DataTable({ headers, rows, loading, emptyMsg }: {
+  headers: string[];
+  rows: (string | number | boolean | null | undefined)[][];
+  loading: boolean;
+  emptyMsg: string;
+}) {
+  if (loading) return <TableSkeleton />;
+  if (!rows.length) return (
+    <div className="text-center py-12 text-slate-400">
+      <Database className="w-10 h-10 mx-auto mb-2 opacity-30" />
+      <p className="text-sm">{emptyMsg}</p>
+    </div>
+  );
+  return (
+    <div className="overflow-x-auto rounded-lg border border-slate-200">
       <table className="w-full text-sm">
-        <thead className="bg-gray-100 border-b">
-          <tr>
-            {columns.map((col) => (
-              <th key={col} className="px-4 py-3 text-left font-semibold text-gray-700">
-                {col}
-              </th>
+        <thead>
+          <tr className="bg-slate-50 border-b border-slate-200">
+            {headers.map(h => (
+              <th key={h} className="text-left px-3 py-2.5 text-xs font-semibold text-slate-600 uppercase tracking-wide whitespace-nowrap">{h}</th>
             ))}
           </tr>
         </thead>
         <tbody>
-          {data.map((row, idx) => (
-            <tr key={idx} className="border-b hover:bg-gray-50">
-              {columns.map((col) => (
-                <td key={col} className="px-4 py-3 text-gray-900">
-                  {typeof row[col.toLowerCase().replace(/\s+/g, "")] === "boolean" ? (
-                    <Badge variant={row[col.toLowerCase().replace(/\s+/g, "")] ? "default" : "secondary"}>
-                      {row[col.toLowerCase().replace(/\s+/g, "")] ? "Yes" : "No"}
-                    </Badge>
-                  ) : typeof row[col.toLowerCase().replace(/\s+/g, "")] === "number" ? (
-                    <span className="font-mono">{row[col.toLowerCase().replace(/\s+/g, "")]}</span>
-                  ) : (
-                    row[col.toLowerCase().replace(/\s+/g, "")] || "-"
-                  )}
+          {rows.map((row, i) => (
+            <tr key={i} className="border-b border-slate-100 hover:bg-slate-50 transition-colors">
+              {row.map((cell, j) => (
+                <td key={j} className="px-3 py-2.5 text-slate-700 whitespace-nowrap">
+                  {cell === null || cell === undefined
+                    ? <span className="text-slate-300">—</span>
+                    : typeof cell === 'boolean'
+                      ? <Badge variant={cell ? 'default' : 'secondary'}>{cell ? 'Yes' : 'No'}</Badge>
+                      : String(cell)}
                 </td>
               ))}
             </tr>
           ))}
         </tbody>
       </table>
+      <div className="px-3 py-2 bg-slate-50 border-t border-slate-200 text-xs text-slate-400">{rows.length} records shown</div>
     </div>
   );
+}
 
+function SearchBar({ value, onChange, onSearch, placeholder }: {
+  value: string; onChange: (v: string) => void; onSearch: () => void; placeholder: string;
+}) {
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-3xl font-bold text-gray-900">Supply Chain Data</h1>
-        <Button variant="outline" className="gap-2">
-          <Download className="w-4 h-4" />
-          Export
-        </Button>
+    <div className="flex gap-2 mb-3">
+      <div className="relative flex-1">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+        <Input className="pl-9" placeholder={placeholder} value={value}
+          onChange={e => onChange(e.target.value)} onKeyDown={e => e.key === 'Enter' && onSearch()} />
       </div>
+      <button onClick={onSearch}
+        className="px-4 py-2 bg-slate-800 text-white text-sm rounded-lg hover:bg-slate-700 transition-colors">
+        Search
+      </button>
+    </div>
+  );
+}
 
-      <Card>
-        <CardHeader>
-          <div className="flex items-center gap-2">
-            <Search className="w-4 h-4 text-gray-500" />
-            <Input
-              placeholder="Search across all tables..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="flex-1"
-            />
-          </div>
-        </CardHeader>
-      </Card>
+function FgMasterTab() {
+  const [s, setS] = useState(''); const [q, setQ] = useState('');
+  const { data, isLoading } = trpc.data.fgMaster.useQuery({ search: q });
+  const rows = (data ?? []).map(r => [r.skuId, r.description, r.brand, r.category, r.division, r.packFormat, r.uom, r.skuStatus, r.lifecycleStage, r.active]);
+  return (<><SearchBar value={s} onChange={setS} onSearch={() => setQ(s)} placeholder="Search SKU, description, brand..." />
+    <DataTable headers={['SKU ID','Description','Brand','Category','Division','Pack Format','UOM','Status','Lifecycle','Active']} rows={rows} loading={isLoading} emptyMsg="No FG master data. Upload via Data Import." /></>);
+}
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Master Data & Inventory</CardTitle>
+function RmMasterTab() {
+  const [s, setS] = useState(''); const [q, setQ] = useState('');
+  const { data, isLoading } = trpc.data.rmMaster.useQuery({ search: q });
+  const rows = (data ?? []).map(r => [r.materialId, r.description, r.category, r.rmType, r.uom, r.leadTimeDays, r.supplierName, r.country, r.qualityStatus]);
+  return (<><SearchBar value={s} onChange={setS} onSearch={() => setQ(s)} placeholder="Search material ID or description..." />
+    <DataTable headers={['Material ID','Description','Category','Type','UOM','Lead Time (d)','Supplier','Country','QC Status']} rows={rows} loading={isLoading} emptyMsg="No RM master data. Upload via Data Import." /></>);
+}
+
+function BomTab() {
+  const [s, setS] = useState(''); const [q, setQ] = useState('');
+  const { data, isLoading } = trpc.data.bom.useQuery({ search: q });
+  const rows = (data ?? []).map(r => [r.bomId, r.fgCode, r.fgDescription, r.componentType, r.componentCode, r.componentDescription, r.qtyPerFg, r.uom, r.stdCostAed]);
+  return (<><SearchBar value={s} onChange={setS} onSearch={() => setQ(s)} placeholder="Search FG code or component..." />
+    <DataTable headers={['BOM ID','FG Code','FG Desc','Comp Type','Comp Code','Comp Desc','Qty/FG','UOM','Std Cost AED']} rows={rows} loading={isLoading} emptyMsg="No BOM data. Upload via Data Import." /></>);
+}
+
+function InventoryTab() {
+  const [s, setS] = useState(''); const [q, setQ] = useState('');
+  const { data, isLoading } = trpc.data.inventory.useQuery({ search: q });
+  const rows = (data ?? []).map(r => [r.inventoryId, r.itemId, r.itemType, r.location, r.qtyOnHand, r.available, r.holdQty, r.stockStatus, r.ageDays, r.inventoryValueAed]);
+  return (<><SearchBar value={s} onChange={setS} onSearch={() => setQ(s)} placeholder="Search item ID or location..." />
+    <DataTable headers={['Inv ID','Item ID','Type','Location','On Hand','Available','Hold','Status','Age (d)','Value AED']} rows={rows} loading={isLoading} emptyMsg="No inventory data. Upload via Data Import." /></>);
+}
+
+function SalesHistoryTab() {
+  const [s, setS] = useState(''); const [q, setQ] = useState('');
+  const { data, isLoading } = trpc.data.salesHistory.useQuery({ search: q });
+  const rows = (data ?? []).map(r => [r.month, r.fgCode, r.fgDescription, r.division, r.country, r.channel, r.unitsSold, r.netSalesAed, r.fillRatePercent]);
+  return (<><SearchBar value={s} onChange={setS} onSearch={() => setQ(s)} placeholder="Search SKU or country..." />
+    <DataTable headers={['Month','FG Code','Description','Division','Country','Channel','Units Sold','Net Sales AED','Fill Rate %']} rows={rows} loading={isLoading} emptyMsg="No sales history. Upload via Data Import." /></>);
+}
+
+function ForecastTab() {
+  const [s, setS] = useState(''); const [q, setQ] = useState('');
+  const { data, isLoading } = trpc.data.forecast.useQuery({ search: q });
+  const rows = (data ?? []).map(r => [r.month, r.fgCode, r.fgDescription, r.country, r.channel, r.forecastUnits, r.forecastRevenueAed, r.confidencePercent, r.forecastMethod]);
+  return (<><SearchBar value={s} onChange={setS} onSearch={() => setQ(s)} placeholder="Search SKU or country..." />
+    <DataTable headers={['Month','FG Code','Description','Country','Channel','Forecast Units','Revenue AED','Confidence %','Method']} rows={rows} loading={isLoading} emptyMsg="No forecast data. Upload via Data Import." /></>);
+}
+
+function PoDataTab() {
+  const [s, setS] = useState(''); const [q, setQ] = useState('');
+  const { data, isLoading } = trpc.data.poData.useQuery({ search: q });
+  const rows = (data ?? []).map(r => [r.poNo, r.itemCode, r.description, r.supplierName, r.supplierCountry, r.qtyOrdered, r.openQty, r.poValueAed, r.currency, r.status, r.confirmedEta ? new Date(r.confirmedEta).toLocaleDateString() : null]);
+  return (<><SearchBar value={s} onChange={setS} onSearch={() => setQ(s)} placeholder="Search PO number or supplier..." />
+    <DataTable headers={['PO No','Item Code','Description','Supplier','Country','Qty Ordered','Open Qty','Value AED','Currency','Status','ETA']} rows={rows} loading={isLoading} emptyMsg="No PO data. Upload via Data Import." /></>);
+}
+
+function SuppliersTab() {
+  const [s, setS] = useState(''); const [q, setQ] = useState('');
+  const { data, isLoading } = trpc.data.suppliers.useQuery({ search: q });
+  const rows = (data ?? []).map(r => [r.supplierCode, r.supplierName, r.category, r.country, r.leadTimeDays, r.paymentTerms, r.approved]);
+  return (<><SearchBar value={s} onChange={setS} onSearch={() => setQ(s)} placeholder="Search supplier code or name..." />
+    <DataTable headers={['Code','Name','Category','Country','Lead Time (d)','Payment Terms','Approved']} rows={rows} loading={isLoading} emptyMsg="No supplier data. Upload via Data Import." /></>);
+}
+
+const TABS = [
+  { value: 'fg', label: 'FG Master', icon: Package, component: FgMasterTab },
+  { value: 'rm', label: 'RM Master', icon: Box, component: RmMasterTab },
+  { value: 'bom', label: 'BOM', icon: Layers, component: BomTab },
+  { value: 'inventory', label: 'Inventory', icon: Database, component: InventoryTab },
+  { value: 'sales', label: 'Sales History', icon: BarChart2, component: SalesHistoryTab },
+  { value: 'forecast', label: 'Forecast', icon: TrendingUp, component: ForecastTab },
+  { value: 'po', label: 'PO Data', icon: ShoppingCart, component: PoDataTab },
+  { value: 'suppliers', label: 'Suppliers', icon: Truck, component: SuppliersTab },
+];
+
+export default function DataTables() {
+  return (
+    <div className="p-6 space-y-4 bg-slate-50 min-h-full">
+      <div>
+        <h1 className="text-2xl font-bold text-slate-900">Supply Chain Data</h1>
+        <p className="text-sm text-slate-500 mt-0.5">Browse and search all master data tables — live from database</p>
+      </div>
+      <Card className="border border-slate-200 shadow-sm">
+        <CardHeader className="pb-3">
+          <CardTitle className="text-sm font-semibold text-slate-700">Data Lake</CardTitle>
         </CardHeader>
         <CardContent>
-          <Tabs value={activeTab} onValueChange={setActiveTab}>
-            <TabsList className="grid w-full grid-cols-4">
-              <TabsTrigger value="fg-master">FG Master</TabsTrigger>
-              <TabsTrigger value="rm-master">RM Master</TabsTrigger>
-              <TabsTrigger value="inventory">Inventory</TabsTrigger>
-              <TabsTrigger value="po-data">PO Data</TabsTrigger>
+          <Tabs defaultValue="fg">
+            <TabsList className="flex flex-wrap h-auto gap-1 bg-slate-100 p-1 rounded-lg mb-4">
+              {TABS.map(t => {
+                const Icon = t.icon;
+                return (
+                  <TabsTrigger key={t.value} value={t.value} className="flex items-center gap-1.5 text-xs px-3 py-1.5">
+                    <Icon className="w-3.5 h-3.5" />{t.label}
+                  </TabsTrigger>
+                );
+              })}
             </TabsList>
-
-            <TabsContent value="fg-master" className="mt-6">
-              {renderTable(fgMasterData, ["SKU", "Description", "Division", "Category", "Active", "Price"])}
-            </TabsContent>
-
-            <TabsContent value="rm-master" className="mt-6">
-              {renderTable(rmMasterData, ["Material", "Description", "Category", "Supplier", "Lead Time", "Cost"])}
-            </TabsContent>
-
-            <TabsContent value="inventory" className="mt-6">
-              {renderTable(inventoryData, ["Item", "Location", "Qty", "DOS", "Status"])}
-            </TabsContent>
-
-            <TabsContent value="po-data" className="mt-6">
-              {renderTable(poData, ["PO", "Item", "Supplier", "Qty", "Value", "Status", "ETA"])}
-            </TabsContent>
+            {TABS.map(t => (
+              <TabsContent key={t.value} value={t.value}>
+                <t.component />
+              </TabsContent>
+            ))}
           </Tabs>
         </CardContent>
       </Card>

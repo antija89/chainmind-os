@@ -99,12 +99,10 @@ export default function AgentChat() {
 
   const [messages, setMessages] = useState<Message[]>([makeWelcome(agent)]);
   const [input, setInput] = useState('');
-  const [conversationId, setConversationId] = useState<string | undefined>(undefined);
   const bottomRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     setMessages([makeWelcome(agent)]);
-    setConversationId(undefined);
     setInput('');
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [agentId]);
@@ -115,7 +113,6 @@ export default function AgentChat() {
 
   const sendMessage = trpc.agents.sendMessage.useMutation({
     onSuccess: (data) => {
-      if (data.conversationId) setConversationId(data.conversationId);
       const content = typeof data.message === 'string' ? data.message : String(data.message);
       setMessages(prev => [
         ...prev,
@@ -153,7 +150,7 @@ export default function AgentChat() {
     ]);
     setInput('');
 
-    sendMessage.mutate({ agentName: agent.name, message: msg, conversationId });
+    sendMessage.mutate({ agentId, agentName: agent.name, message: msg });
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -162,7 +159,6 @@ export default function AgentChat() {
 
   const handleClear = () => {
     setMessages([makeWelcome(agent)]);
-    setConversationId(undefined);
   };
 
   const showQuickPrompts = messages.length <= 1;

@@ -1,7 +1,7 @@
 import { invokeLLM } from './_core/llm';
 
 export interface LLMConfig {
-  provider: 'gemini' | 'openai' | 'anthropic' | 'custom';
+  provider: 'gemini' | 'openai' | 'anthropic' | 'manus' | 'custom';
   apiKey: string;
   apiUrl?: string;
   model: string;

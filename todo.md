@@ -114,3 +114,28 @@
 - [ ] Enforce route-level access in frontend
 - [ ] Show/hide sidebar items by role
 - [ ] Restrict HIL approve/reject to ops_head and admin only
+
+## Option A: Live DB-Backed Pages
+- [ ] Dashboard: compute KPIs from live DB (sales_history, inventory, po_data)
+- [ ] Dashboard: real-time alerts from hil_gates table
+- [ ] Data Tables: wire all 8 tabs to live DB (FG, RM, BOM, Inventory, Sales, Forecast, PO, Suppliers)
+- [ ] Data Tables: add search/filter functionality
+- [ ] HIL Inbox: load pending items from hil_gates DB table
+- [ ] HIL Inbox: persist Approve/Reject/Override to DB + audit_log
+- [ ] Plan Store: load plans from plan_store DB table
+- [ ] Plan Store: implement Submit/Approve/Reject actions in DB + audit_log
+- [ ] Audit Trail: load real audit_log entries from DB
+
+## Option C: Proper LLM Tool Calling
+- [ ] Define tool definitions schema for all agent tools
+- [ ] Update sendMessage to send tool definitions to LLM
+- [ ] Implement tool execution dispatcher on server
+- [ ] Handle multi-turn: LLM calls tool → server runs → result fed back
+- [ ] Add tool call display in chat UI
+
+## Option D: Agent Roster & Instruction Editor
+- [ ] Build /agents page listing all agents with status and KPIs
+- [ ] Build /agents/:id workspace (chat + KPIs + SOPs + tools list)
+- [ ] Build instruction stack editor (SOPs, decision rules, guardrails)
+- [ ] Persist instruction stack changes to agents DB table
+- [ ] Add Agents nav link in sidebar

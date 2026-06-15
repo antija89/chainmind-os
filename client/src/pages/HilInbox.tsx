@@ -1,178 +1,179 @@
-import { useState } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { AlertCircle, CheckCircle, XCircle } from "lucide-react";
+import { useState } from 'react';
+import { trpc } from '@/lib/trpc';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { Skeleton } from '@/components/ui/skeleton';
+import { Textarea } from '@/components/ui/textarea';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { CheckCircle, XCircle, AlertTriangle, Clock, RefreshCw, Inbox } from 'lucide-react';
+import { toast } from 'sonner';
+import { formatDistanceToNow } from 'date-fns';
 
-interface HILItem {
-  id: string;
-  type: "po_approval" | "exception" | "threshold" | "override";
+type HilGate = {
+  id: number;
   title: string;
   description: string;
-  priority: "high" | "medium" | "low";
-  value?: number;
-  createdAt: string;
-  requiredBy: string;
+  agentName: string;
+  gateType: string;
+  priority: string;
+  status: string;
+  requestedData?: string | null;
+  createdAt: Date;
+};
+
+const PRIORITY_STYLE: Record<string, string> = {
+  urgent: 'border-l-red-500 bg-red-50',
+  normal: 'border-l-amber-500 bg-amber-50',
+  low: 'border-l-blue-500 bg-blue-50',
+};
+
+const PRIORITY_BADGE: Record<string, 'destructive' | 'default' | 'secondary'> = {
+  urgent: 'destructive',
+  normal: 'default',
+  low: 'secondary',
+};
+
+function ActionDialog({ gate, action, open, onClose, onConfirm }: {
+  gate: HilGate; action: 'approve' | 'reject' | 'override';
+  open: boolean; onClose: () => void; onConfirm: (reason: string) => void;
+}) {
+  const [reason, setReason] = useState('');
+  const labels = { approve: 'Approve', reject: 'Reject', override: 'Override' };
+  const colors = { approve: 'bg-emerald-600 hover:bg-emerald-700', reject: 'bg-red-600 hover:bg-red-700', override: 'bg-amber-600 hover:bg-amber-700' };
+
+  return (
+    <Dialog open={open} onOpenChange={onClose}>
+      <DialogContent className="max-w-md">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            {action === 'approve' && <CheckCircle className="w-5 h-5 text-emerald-600" />}
+            {action === 'reject' && <XCircle className="w-5 h-5 text-red-600" />}
+            {action === 'override' && <AlertTriangle className="w-5 h-5 text-amber-600" />}
+            {labels[action]}: {gate.title}
+          </DialogTitle>
+        </DialogHeader>
+        <div className="space-y-3 py-2">
+          <p className="text-sm text-slate-600">{gate.description}</p>
+          <div>
+            <label className="text-xs font-semibold text-slate-700 mb-1 block">
+              Reason <span className="text-red-500">*</span>
+            </label>
+            <Textarea
+              placeholder={`Enter reason for ${action}...`}
+              value={reason}
+              onChange={e => setReason(e.target.value)}
+              className="min-h-[80px]"
+            />
+            <p className="text-xs text-slate-400 mt-1">Reason is mandatory and will be logged in the audit trail.</p>
+          </div>
+        </div>
+        <DialogFooter>
+          <button onClick={onClose} className="px-4 py-2 text-sm border border-slate-200 rounded-lg hover:bg-slate-50">Cancel</button>
+          <button
+            onClick={() => { if (!reason.trim()) { toast.error('Reason is required'); return; } onConfirm(reason); }}
+            className={`px-4 py-2 text-sm text-white rounded-lg transition-colors ${colors[action]}`}
+          >
+            Confirm {labels[action]}
+          </button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
 }
 
 export default function HilInbox() {
-  const [items, setItems] = useState<HILItem[]>([
-    {
-      id: "hil-001",
-      type: "po_approval",
-      title: "High-Value PO Approval",
-      description: "PO-2024-001 (AED 84,500) from AlRawabi requires Ops Head approval",
-      priority: "high",
-      value: 84500,
-      createdAt: "2024-06-14 12:15",
-      requiredBy: "2024-06-15",
+  const [dialog, setDialog] = useState<{ gate: HilGate; action: 'approve' | 'reject' | 'override' } | null>(null);
+  const utils = trpc.useUtils();
+
+  const { data: gates, isLoading } = trpc.hil.list.useQuery({ status: 'pending' });
+
+  const respondMutation = trpc.hil.respond.useMutation({
+    onSuccess: () => {
+      toast.success('Response recorded and audit trail updated');
+      utils.hil.list.invalidate();
+      utils.dashboard.kpis.invalidate();
+      setDialog(null);
     },
-    {
-      id: "hil-002",
-      type: "exception",
-      title: "Inventory Exception",
-      description: "SKU-001 DOS below 20 days. Current: 18 days. Recommend emergency purchase.",
-      priority: "high",
-      createdAt: "2024-06-14 11:45",
-      requiredBy: "2024-06-14",
-    },
-    {
-      id: "hil-003",
-      type: "threshold",
-      title: "Service Level Threshold Breach",
-      description: "Service level dropped to 94.2%, below 95% target. Review demand forecast.",
-      priority: "medium",
-      createdAt: "2024-06-14 10:30",
-      requiredBy: "2024-06-15",
-    },
-  ]);
+    onError: (err) => toast.error(`Failed: ${err.message}`),
+  });
 
-  const [selectedItem, setSelectedItem] = useState<HILItem | null>(null);
-  const [action, setAction] = useState<"approve" | "reject" | "override" | null>(null);
-  const [reason, setReason] = useState("");
-  const [isSubmitting, setIsSubmitting] = useState(false);
-
-  const handleAction = async (itemId: string, actionType: "approve" | "reject" | "override") => {
-    const item = items.find((i) => i.id === itemId);
-    if (!item) return;
-
-    setSelectedItem(item);
-    setAction(actionType);
+  const handleConfirm = (reason: string) => {
+    if (!dialog) return;
+    respondMutation.mutate({ id: dialog.gate.id, action: dialog.action, reason });
   };
 
-  const handleSubmit = async () => {
-    if (!reason.trim()) {
-      alert("Reason is mandatory");
-      return;
-    }
-
-    setIsSubmitting(true);
-
-    setTimeout(() => {
-      console.log(`Action: ${action}, Item: ${selectedItem?.id}, Reason: ${reason}`);
-
-      setItems((prev) => prev.filter((i) => i.id !== selectedItem?.id));
-      setSelectedItem(null);
-      setAction(null);
-      setReason("");
-      setIsSubmitting(false);
-
-      alert(`${action?.toUpperCase()} recorded with reason: "${reason}"`);
-    }, 1000);
-  };
-
-  const priorityColor = {
-    high: "bg-red-100 text-red-800",
-    medium: "bg-amber-100 text-amber-800",
-    low: "bg-green-100 text-green-800",
-  };
-
-  const typeIcon = {
-    po_approval: "💰",
-    exception: "⚠️",
-    threshold: "📊",
-    override: "🔄",
-  };
+  const pendingCount = gates?.length ?? 0;
 
   return (
-    <div className="space-y-6">
+    <div className="p-6 space-y-4 bg-slate-50 min-h-full">
       <div className="flex items-center justify-between">
-        <h1 className="text-3xl font-bold text-gray-900">Needs Your Input</h1>
-        <Badge className="bg-red-500 text-white text-lg px-3 py-1">{items.length} Pending</Badge>
+        <div>
+          <h1 className="text-2xl font-bold text-slate-900 flex items-center gap-2">
+            <Inbox className="w-6 h-6 text-slate-700" />
+            HIL Inbox
+          </h1>
+          <p className="text-sm text-slate-500 mt-0.5">Human-in-the-loop approvals — items requiring your decision</p>
+        </div>
+        {pendingCount > 0 && (
+          <Badge variant="destructive" className="text-sm px-3 py-1">{pendingCount} Pending</Badge>
+        )}
       </div>
 
-      {items.length === 0 ? (
-        <Card>
-          <CardContent className="pt-12 pb-12 text-center">
-            <CheckCircle className="w-16 h-16 text-green-500 mx-auto mb-4" />
-            <h3 className="text-lg font-semibold text-gray-900">All Clear!</h3>
-            <p className="text-gray-600">No pending approvals or exceptions</p>
+      {isLoading ? (
+        <div className="space-y-3">
+          {Array.from({ length: 3 }).map((_, i) => <Skeleton key={i} className="h-32 w-full" />)}
+        </div>
+      ) : !gates || gates.length === 0 ? (
+        <Card className="border border-slate-200 shadow-sm">
+          <CardContent className="py-16 text-center text-slate-400">
+            <CheckCircle className="w-12 h-12 mx-auto mb-3 opacity-30" />
+            <p className="text-lg font-medium">All clear!</p>
+            <p className="text-sm mt-1">No pending approvals at this time.</p>
           </CardContent>
         </Card>
       ) : (
         <div className="space-y-3">
-          {items.map((item) => (
-            <Card key={item.id} className="hover:shadow-md transition-shadow">
-              <CardContent className="pt-6">
-                <div className="flex items-start justify-between">
-                  <div className="flex-1">
-                    <div className="flex items-center gap-3 mb-2">
-                      <span className="text-2xl">{typeIcon[item.type]}</span>
-                      <h3 className="text-lg font-semibold text-gray-900">{item.title}</h3>
-                      <Badge className={priorityColor[item.priority]}>
-                        {item.priority.toUpperCase()}
-                      </Badge>
+          {gates.map(gate => (
+            <Card key={gate.id} className={`border-l-4 border border-slate-200 shadow-sm ${PRIORITY_STYLE[gate.priority ?? 'normal'] || PRIORITY_STYLE.normal}`}>
+              <CardContent className="p-4">
+                <div className="flex items-start justify-between gap-4">
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="font-semibold text-slate-900 text-sm">{gate.title}</span>
+                      <Badge variant={PRIORITY_BADGE[gate.priority ?? 'normal'] || 'default'} className="text-xs capitalize">{gate.priority ?? 'normal'}</Badge>
+                      <Badge variant="outline" className="text-xs">{gate.gateType}</Badge>
+                      <Badge variant="outline" className="text-xs text-slate-500">{gate.agentName}</Badge>
                     </div>
-                    <p className="text-gray-700 mb-3">{item.description}</p>
-                    <div className="grid grid-cols-3 gap-4 text-sm text-gray-600">
-                      <div>
-                        <p className="text-xs font-medium text-gray-500">CREATED</p>
-                        <p>{item.createdAt}</p>
+                    <p className="text-sm text-slate-600 mt-1.5">{gate.description}</p>
+                    {gate.requestedData && (
+                      <div className="mt-2 p-2 bg-white rounded border border-slate-200 text-xs text-slate-600 font-mono max-h-20 overflow-y-auto">
+                        {gate.requestedData}
                       </div>
-                      <div>
-                        <p className="text-xs font-medium text-gray-500">REQUIRED BY</p>
-                        <p>{item.requiredBy}</p>
-                      </div>
-                      {item.value && (
-                        <div>
-                          <p className="text-xs font-medium text-gray-500">VALUE</p>
-                          <p className="font-mono font-semibold">AED {item.value.toLocaleString()}</p>
-                        </div>
-                      )}
-                    </div>
+                    )}
+                    <p className="text-xs text-slate-400 mt-2 flex items-center gap-1">
+                      <Clock className="w-3 h-3" />
+                      {gate.createdAt ? formatDistanceToNow(new Date(gate.createdAt), { addSuffix: true }) : 'Unknown time'}
+                    </p>
                   </div>
-
-                  <div className="flex gap-2 ml-4">
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      className="text-green-600 border-green-300 hover:bg-green-50"
-                      onClick={() => handleAction(item.id, "approve")}
+                  <div className="flex flex-col gap-2 shrink-0">
+                    <button
+                      onClick={() => setDialog({ gate: gate as HilGate, action: 'approve' })}
+                      className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 text-white text-xs rounded-lg hover:bg-emerald-700 transition-colors"
                     >
-                      <CheckCircle className="w-4 h-4 mr-1" />
-                      Approve
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      className="text-red-600 border-red-300 hover:bg-red-50"
-                      onClick={() => handleAction(item.id, "reject")}
+                      <CheckCircle className="w-3.5 h-3.5" /> Approve
+                    </button>
+                    <button
+                      onClick={() => setDialog({ gate: gate as HilGate, action: 'reject' })}
+                      className="flex items-center gap-1.5 px-3 py-1.5 bg-red-600 text-white text-xs rounded-lg hover:bg-red-700 transition-colors"
                     >
-                      <XCircle className="w-4 h-4 mr-1" />
-                      Reject
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      className="text-amber-600 border-amber-300 hover:bg-amber-50"
-                      onClick={() => handleAction(item.id, "override")}
+                      <XCircle className="w-3.5 h-3.5" /> Reject
+                    </button>
+                    <button
+                      onClick={() => setDialog({ gate: gate as HilGate, action: 'override' })}
+                      className="flex items-center gap-1.5 px-3 py-1.5 bg-amber-500 text-white text-xs rounded-lg hover:bg-amber-600 transition-colors"
                     >
-                      <AlertCircle className="w-4 h-4 mr-1" />
-                      Override
-                    </Button>
+                      <RefreshCw className="w-3.5 h-3.5" /> Override
+                    </button>
                   </div>
                 </div>
               </CardContent>
@@ -181,56 +182,15 @@ export default function HilInbox() {
         </div>
       )}
 
-      <Dialog open={!!action} onOpenChange={() => action && (setAction(null), setReason(""))}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>
-              {action === "approve" && "Approve Request"}
-              {action === "reject" && "Reject Request"}
-              {action === "override" && "Override Decision"}
-            </DialogTitle>
-          </DialogHeader>
-
-          <div className="space-y-4">
-            <div>
-              <p className="text-sm font-medium text-gray-700 mb-2">Item</p>
-              <p className="text-gray-900 font-semibold">{selectedItem?.title}</p>
-            </div>
-
-            <div>
-              <label className="text-sm font-medium text-gray-700 block mb-2">
-                Reason <span className="text-red-500">*</span>
-              </label>
-              <Textarea
-                placeholder="Provide detailed reason for this decision (mandatory)"
-                value={reason}
-                onChange={(e) => setReason(e.target.value)}
-                className="min-h-24"
-              />
-              <p className="text-xs text-gray-500 mt-1">This will be logged in the audit trail</p>
-            </div>
-
-            <div className="flex gap-2 justify-end">
-              <Button variant="outline" onClick={() => (setAction(null), setReason(""))}>
-                Cancel
-              </Button>
-              <Button
-                onClick={handleSubmit}
-                disabled={isSubmitting || !reason.trim()}
-                className={
-                  action === "approve"
-                    ? "bg-green-600 hover:bg-green-700"
-                    : action === "reject"
-                      ? "bg-red-600 hover:bg-red-700"
-                      : "bg-amber-600 hover:bg-amber-700"
-                }
-              >
-                {isSubmitting ? "Processing..." : `${action?.toUpperCase()}`}
-              </Button>
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
+      {dialog && (
+        <ActionDialog
+          gate={dialog.gate}
+          action={dialog.action}
+          open={!!dialog}
+          onClose={() => setDialog(null)}
+          onConfirm={handleConfirm}
+        />
+      )}
     </div>
   );
 }

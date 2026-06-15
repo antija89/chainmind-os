@@ -278,9 +278,15 @@ export type PlanStore = typeof planStore.$inferSelect;
 export type InsertPlanStore = typeof planStore.$inferInsert;
 
 export const hilGates = mysqlTable("hil_gates", {
-  gateId: varchar("gate_id", { length: 64 }).primaryKey(),
+  id: int("id").autoincrement().primaryKey(),
+  gateId: varchar("gate_id", { length: 64 }).notNull().unique(),
+  title: varchar("title", { length: 255 }),
+  description: text("description"),
+  agentName: varchar("agent_name", { length: 128 }),
+  gateType: varchar("gate_type", { length: 128 }),
   triggerType: varchar("trigger_type", { length: 128 }),
   agentId: varchar("agent_id", { length: 64 }),
+  requestedData: text("requested_data"),
   payload: json("payload"),
   status: varchar("status", { length: 32 }).default("pending"),
   priority: varchar("priority", { length: 32 }).default("normal"),
@@ -295,16 +301,22 @@ export type HilGates = typeof hilGates.$inferSelect;
 export type InsertHilGates = typeof hilGates.$inferInsert;
 
 export const auditLog = mysqlTable("audit_log", {
-  logId: varchar("log_id", { length: 64 }).primaryKey(),
-  timestamp: timestamp("timestamp").defaultNow(),
+  id: int("id").autoincrement().primaryKey(),
+  logId: varchar("log_id", { length: 64 }).notNull().unique(),
+  createdAt: timestamp("created_at").defaultNow(),
   actorId: varchar("actor_id", { length: 64 }),
+  actorName: varchar("actor_name", { length: 255 }),
   actorType: varchar("actor_type", { length: 32 }),
   action: varchar("action", { length: 128 }),
-  resourceType: varchar("resource_type", { length: 64 }),
-  resourceId: varchar("resource_id", { length: 64 }),
+  entityType: varchar("entity_type", { length: 64 }),
+  entityId: varchar("entity_id", { length: 64 }),
+  description: text("description"),
   reason: text("reason"),
   impact: json("impact"),
   metadata: json("metadata"),
+  // legacy aliases kept for backward compat
+  resourceType: varchar("resource_type", { length: 64 }),
+  resourceId: varchar("resource_id", { length: 64 }),
 });
 
 export type AuditLog = typeof auditLog.$inferSelect;
