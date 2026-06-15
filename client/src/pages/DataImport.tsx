@@ -49,71 +49,77 @@ export default function DataImport() {
     }
 
     setUploading(true);
-    setUploadProgress(0);
-    const reader = new FileReader();
+    setUploadProgress(10);
+    
+    try {
+      const reader = new FileReader();
+      
+      reader.onload = async (event) => {
+        try {
+          setUploadProgress(30);
+          
+          const data = event.target?.result as ArrayBuffer;
+          const bytes = new Uint8Array(data);
+          let binary = '';
+          for (let i = 0; i < bytes.byteLength; i++) {
+            binary += String.fromCharCode(bytes[i]);
+          }
+          const base64 = btoa(binary);
 
-    // Track file reading progress
-    reader.onprogress = (event) => {
-      if (event.lengthComputable) {
-        // File reading is 30% of total progress
-        const progress = (event.loaded / event.total) * 30;
-        setUploadProgress(progress);
-      }
-    };
+          setUploadProgress(50);
+          
+          // Call the mutation and wait for response
+          const response = await importMutation.mutateAsync({
+            tableName: selectedTable,
+            fileData: base64,
+            fileName: file.name,
+          });
 
-    reader.onload = async (event) => {
-      try {
-        setUploadProgress(30); // File read complete
-        
-        const data = event.target?.result as ArrayBuffer;
-        // Use browser-native Uint8Array → base64 (no Node Buffer needed)
-        const bytes = new Uint8Array(data);
-        let binary = '';
-        for (let i = 0; i < bytes.byteLength; i++) binary += String.fromCharCode(bytes[i]);
-        const base64 = btoa(binary);
+          setUploadProgress(100);
 
-        setUploadProgress(50); // Base64 encoding complete
-        
-        const response = await importMutation.mutateAsync({
-          tableName: selectedTable,
-          fileData: base64,
-          fileName: file.name,
-        });
-
-        setUploadProgress(100); // Upload complete
-
-        setResult({
-          success: response.success,
-          message: response.message,
-          rowsInserted: response.rowsInserted,
-          rowsSkipped: response.rowsSkipped,
-          errors: response.errors,
-        });
-        
-        if (response.success) {
-          setFile(null);
+          setResult({
+            success: response.success,
+            message: response.message,
+            rowsInserted: response.rowsInserted,
+            rowsSkipped: response.rowsSkipped,
+            errors: response.errors,
+          });
+          
+          if (response.success) {
+            setFile(null);
+            setTimeout(() => setUploadProgress(0), 1000);
+          }
+        } catch (error) {
+          console.error('Upload error:', error);
+          setResult({
+            success: false,
+            message: `Error: ${error instanceof Error ? error.message : 'Unknown error'}`,
+          });
+          setUploadProgress(0);
+        } finally {
+          setUploading(false);
         }
-      } catch (error) {
+      };
+
+      reader.onerror = () => {
         setResult({
           success: false,
-          message: `Error: ${error instanceof Error ? error.message : 'Unknown error'}`,
+          message: 'Error reading file. Please try again.',
         });
-        setUploadProgress(0);
-      } finally {
         setUploading(false);
-      }
-    };
+        setUploadProgress(0);
+      };
 
-    reader.onerror = () => {
+      reader.readAsArrayBuffer(file);
+    } catch (error) {
+      console.error('Upload error:', error);
       setResult({
         success: false,
-        message: 'Error reading file. Please try again.',
+        message: `Error: ${error instanceof Error ? error.message : 'Unknown error'}`,
       });
       setUploading(false);
       setUploadProgress(0);
-    };
-
-    reader.readAsArrayBuffer(file);
+    }
   };
 
   return (
@@ -169,7 +175,7 @@ export default function DataImport() {
           </div>
 
           {/* Progress Bar */}
-          {uploading && (
+          {uploading && uploadProgress > 0 && (
             <div className="space-y-2">
               <div className="flex justify-between items-center">
                 <span className="text-sm font-medium">Uploading...</span>
