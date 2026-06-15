@@ -14,6 +14,7 @@ import PlanStore from "./pages/PlanStore";
 import AuditTrail from "./pages/AuditTrail";
 import Settings from "./pages/Settings";
 import AgentRoster from "./pages/AgentRoster";
+import AgentWorkspace from "./pages/AgentWorkspace";
 
 function Router() {
   return (
@@ -27,6 +28,7 @@ function Router() {
       <Route path="/audit-trail" component={() => <ChainMindLayout><AuditTrail /></ChainMindLayout>} />
       <Route path="/settings" component={() => <ChainMindLayout><Settings /></ChainMindLayout>} />
       <Route path="/agents" component={() => <ChainMindLayout><AgentRoster /></ChainMindLayout>} />
+      <Route path="/agents/:agentId" component={() => <ChainMindLayout><AgentWorkspace /></ChainMindLayout>} />
       <Route path="/404" component={NotFound} />
       <Route component={NotFound} />
     </Switch>

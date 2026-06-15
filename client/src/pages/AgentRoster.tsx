@@ -1,10 +1,10 @@
 import { useState } from 'react';
+import { useLocation } from 'wouter';
 import { trpc } from '@/lib/trpc';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Textarea } from '@/components/ui/textarea';
-import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Bot, Edit2, Save, X, ChevronDown, ChevronUp, Wrench } from 'lucide-react';
 import { toast } from 'sonner';
@@ -36,6 +36,7 @@ type Agent = {
 
 function AgentCard({ agent, onEdit }: { agent: Agent; onEdit: (a: Agent) => void }) {
   const [expanded, setExpanded] = useState(false);
+  const [, navigate] = useLocation();
   const colorClass = AGENT_COLORS[agent.roleTitle ?? ''] || 'bg-slate-100 text-slate-700 border-slate-200';
 
   return (
@@ -43,20 +44,22 @@ function AgentCard({ agent, onEdit }: { agent: Agent; onEdit: (a: Agent) => void
       <CardHeader className="pb-3">
         <div className="flex items-start justify-between">
           <div className="flex items-center gap-3">
-              <div className={`p-2 rounded-lg border ${colorClass}`}>
+            <div className={`p-2 rounded-lg border ${colorClass}`}>
               <Bot className="w-5 h-5" />
             </div>
             <div>
               <h3 className="font-semibold text-slate-900">{agent.roleTitle ?? agent.agentId}</h3>
-              <p className="text-xs text-slate-500">{agent.domain ?? agent.seniority ?? ''}</p>
+              <p className="text-xs text-slate-500">{agent.seniority ?? ''}</p>
             </div>
           </div>
           <div className="flex items-center gap-2">
             <Badge variant={agent.status === 'active' ? 'default' : 'secondary'} className="text-xs">
               {agent.status === 'active' ? 'Active' : 'Inactive'}
             </Badge>
-            <button onClick={() => onEdit(agent)}
-              className="p-1.5 rounded-lg hover:bg-slate-100 transition-colors text-slate-500 hover:text-slate-800">
+            <button
+              onClick={() => onEdit(agent)}
+              className="p-1.5 rounded-lg hover:bg-slate-100 transition-colors text-slate-500 hover:text-slate-800"
+            >
               <Edit2 className="w-4 h-4" />
             </button>
           </div>
@@ -69,9 +72,15 @@ function AgentCard({ agent, onEdit }: { agent: Agent; onEdit: (a: Agent) => void
             {agent.domain ?? 'No domain description set.'}
           </p>
           {(agent.domain ?? '').length > 200 && (
-            <button onClick={() => setExpanded(!expanded)}
-              className="text-xs text-blue-600 hover:text-blue-700 mt-1 flex items-center gap-1">
-              {expanded ? <><ChevronUp className="w-3 h-3" /> Show less</> : <><ChevronDown className="w-3 h-3" /> Show more</>}
+            <button
+              onClick={() => setExpanded(!expanded)}
+              className="text-xs text-blue-600 hover:text-blue-700 mt-1 flex items-center gap-1"
+            >
+              {expanded ? (
+                <><ChevronUp className="w-3 h-3" /> Show less</>
+              ) : (
+                <><ChevronDown className="w-3 h-3" /> Show more</>
+              )}
             </button>
           )}
         </div>
@@ -88,6 +97,14 @@ function AgentCard({ agent, onEdit }: { agent: Agent; onEdit: (a: Agent) => void
           </div>
         )}
       </CardContent>
+      <div className="px-6 pb-4 pt-1">
+        <button
+          onClick={() => navigate(`/agents/${agent.agentId}`)}
+          className="w-full text-sm text-blue-600 hover:text-blue-700 border border-blue-200 hover:border-blue-300 rounded-lg py-2 transition-colors hover:bg-blue-50 font-medium"
+        >
+          Open Workspace →
+        </button>
+      </div>
     </Card>
   );
 }
@@ -123,17 +140,27 @@ function EditDialog({ agent, open, onClose }: { agent: Agent; open: boolean; onC
           </div>
           <div>
             <label className="text-xs font-semibold text-slate-700 mb-1 block">Instruction Stack (one per line)</label>
-            <Textarea value={instructionStack} onChange={e => setInstructionStack(e.target.value)}
-              className="min-h-[160px] font-mono text-xs" placeholder="Step 1: Always check inventory first&#10;Step 2: Validate against safety stock..." />
+            <Textarea
+              value={instructionStack}
+              onChange={e => setInstructionStack(e.target.value)}
+              className="min-h-[160px] font-mono text-xs"
+              placeholder="Step 1: Always check inventory first&#10;Step 2: Validate against safety stock..."
+            />
             <p className="text-xs text-slate-400 mt-1">Ordered instructions the agent follows for each task.</p>
           </div>
         </div>
         <DialogFooter>
-          <button onClick={onClose} className="flex items-center gap-1.5 px-4 py-2 text-sm border border-slate-200 rounded-lg hover:bg-slate-50">
+          <button
+            onClick={onClose}
+            className="flex items-center gap-1.5 px-4 py-2 text-sm border border-slate-200 rounded-lg hover:bg-slate-50"
+          >
             <X className="w-4 h-4" /> Cancel
           </button>
           <button
-            onClick={() => updateMutation.mutate({ agentId: agent.agentId, instructionStack: instructionStack.split('\n').filter(Boolean) })}
+            onClick={() => updateMutation.mutate({
+              agentId: agent.agentId,
+              instructionStack: instructionStack.split('\n').filter(Boolean),
+            })}
             disabled={updateMutation.isPending}
             className="flex items-center gap-1.5 px-4 py-2 text-sm bg-slate-800 text-white rounded-lg hover:bg-slate-700 transition-colors disabled:opacity-50"
           >

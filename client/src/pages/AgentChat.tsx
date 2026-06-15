@@ -5,7 +5,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
-import { Loader2, Send, RotateCcw, Bot, User } from 'lucide-react';
+import { Loader2, Send, RotateCcw, Bot, User, Wrench } from 'lucide-react';
 import { trpc } from '@/lib/trpc';
 import { toast } from 'sonner';
 import { Streamdown } from 'streamdown';
@@ -82,6 +82,7 @@ type Message = {
   content: string;
   timestamp: Date;
   isError?: boolean;
+  toolsUsed?: string[];
 };
 
 export default function AgentChat() {
@@ -122,6 +123,7 @@ export default function AgentChat() {
           content,
           timestamp: new Date(),
           isError: !data.success,
+          toolsUsed: data.toolsUsed ?? [],
         },
       ]);
     },
@@ -203,6 +205,14 @@ export default function AgentChat() {
                   </div>
                 ) : (
                   <p className="whitespace-pre-wrap leading-relaxed">{msg.content}</p>
+                )}
+                {msg.toolsUsed && msg.toolsUsed.length > 0 && (
+                  <div className="flex flex-wrap gap-1 mt-2 pt-2 border-t border-gray-100">
+                    <Wrench className="h-3 w-3 text-gray-400 mt-0.5 shrink-0" />
+                    {msg.toolsUsed.map((t) => (
+                      <span key={t} className="text-xs px-1.5 py-0.5 rounded bg-gray-100 text-gray-600 font-mono">{t}</span>
+                    ))}
+                  </div>
                 )}
                 <p className={`text-xs mt-2 ${msg.role === 'user' ? 'text-blue-200' : 'text-gray-400'}`}>
                   {msg.timestamp.toLocaleTimeString()}

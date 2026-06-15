@@ -116,26 +116,33 @@
 - [ ] Restrict HIL approve/reject to ops_head and admin only
 
 ## Option A: Live DB-Backed Pages
-- [ ] Dashboard: compute KPIs from live DB (sales_history, inventory, po_data)
-- [ ] Dashboard: real-time alerts from hil_gates table
-- [ ] Data Tables: wire all 8 tabs to live DB (FG, RM, BOM, Inventory, Sales, Forecast, PO, Suppliers)
-- [ ] Data Tables: add search/filter functionality
-- [ ] HIL Inbox: load pending items from hil_gates DB table
-- [ ] HIL Inbox: persist Approve/Reject/Override to DB + audit_log
-- [ ] Plan Store: load plans from plan_store DB table
-- [ ] Plan Store: implement Submit/Approve/Reject actions in DB + audit_log
-- [ ] Audit Trail: load real audit_log entries from DB
+- [x] Dashboard: compute KPIs from live DB (sales_history, inventory, po_data)
+- [x] Dashboard: real-time alerts from hil_gates table
+- [x] Data Tables: wire all 8 tabs to live DB (FG, RM, BOM, Inventory, Sales, Forecast, PO, Suppliers)
+- [x] Data Tables: add search/filter functionality
+- [x] HIL Inbox: load pending items from hil_gates DB table
+- [x] HIL Inbox: persist Approve/Reject/Override to DB + audit_log
+- [x] Plan Store: load plans from plan_store DB table
+- [x] Plan Store: implement Submit/Approve/Reject actions in DB + audit_log
+- [x] Audit Trail: load real audit_log entries from DB
 
 ## Option C: Proper LLM Tool Calling
-- [ ] Define tool definitions schema for all agent tools
-- [ ] Update sendMessage to send tool definitions to LLM
-- [ ] Implement tool execution dispatcher on server
-- [ ] Handle multi-turn: LLM calls tool → server runs → result fed back
-- [ ] Add tool call display in chat UI
+- [x] Define tool definitions schema for all agent tools
+- [x] Update sendMessage to send tool definitions to LLM
+- [x] Implement tool execution dispatcher on server
+- [x] Handle multi-turn: LLM calls tool → server runs → result fed back
+- [x] Add tool call display in chat UI
 
 ## Option D: Agent Roster & Instruction Editor
-- [ ] Build /agents page listing all agents with status and KPIs
-- [ ] Build /agents/:id workspace (chat + KPIs + SOPs + tools list)
-- [ ] Build instruction stack editor (SOPs, decision rules, guardrails)
-- [ ] Persist instruction stack changes to agents DB table
-- [ ] Add Agents nav link in sidebar
+- [x] Build /agents page listing all agents with status and KPIs
+- [x] Build /agents/:id workspace (chat + KPIs + SOPs + tools list)
+- [x] Build instruction stack editor (SOPs, decision rules, guardrails)
+- [x] Persist instruction stack changes to agents DB table
+- [x] Add Agents nav link in sidebar
+
+## Phase 14: AgentWorkspace & Roster Fix
+- [x] Fix AgentRoster JSX error (missing CardContent closing tag)
+- [x] Add "Open Workspace →" button to each agent card
+- [x] AgentWorkspace page at /agents/:agentId with Chat, Instruction Stack, Tools tabs
+- [x] Back navigation from workspace to roster
+- [x] TypeScript compiles with 0 errors
