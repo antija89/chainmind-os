@@ -579,6 +579,32 @@ export const appRouter = router({
         return tool;
       }),
 
+    update: protectedProcedure
+      .input(z.object({
+        toolId: z.string(),
+        name: z.string().optional(),
+        description: z.string().optional(),
+        category: z.enum(["demand", "supply", "production", "procurement", "operations"]).optional(),
+        complexity: z.enum(["simple", "medium", "complex"]).optional(),
+      }))
+      .mutation(async ({ input, ctx }) => {
+        const tool = await updateTool(input.toolId, {
+          name: input.name,
+          description: input.description,
+          category: input.category,
+          complexity: input.complexity,
+        });
+        await writeAuditLog({
+          actorId: ctx.user.openId,
+          actorType: "human",
+          action: "tool_updated",
+          entityType: "tool",
+          entityId: input.toolId,
+          description: `Updated tool: ${input.name || 'unknown'}`,
+        });
+        return tool;
+      }),
+
     delete: adminProcedure
       .input(z.object({ toolId: z.string() }))
       .mutation(async ({ input, ctx }) => {

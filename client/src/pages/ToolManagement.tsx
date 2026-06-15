@@ -6,10 +6,9 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { Spinner } from '@/components/ui/spinner';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { AlertCircle, Plus, Edit2, Trash2, MessageSquare, Search, Filter } from 'lucide-react';
+import { AlertCircle, Plus, Edit2, Trash2, MessageSquare, Search } from 'lucide-react';
 import { Streamdown } from 'streamdown';
 
 interface Tool {
@@ -40,6 +39,7 @@ export function ToolManagement() {
   const [selectedTool, setSelectedTool] = useState<Tool | null>(null);
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const [editingTool, setEditingTool] = useState<Tool | null>(null);
   const [isChatOpen, setIsChatOpen] = useState(false);
   const [chatMessages, setChatMessages] = useState<Message[]>([]);
   const [chatInput, setChatInput] = useState('');
@@ -60,6 +60,7 @@ export function ToolManagement() {
   const utils = trpc.useUtils?.() || {};
   const toolsQuery = trpc.tools?.list?.useQuery?.({}) || { data: [] };
   const createMutation = trpc.tools?.create?.useMutation?.();
+  const updateMutation = trpc.tools?.update?.useMutation?.();
   const deleteMutation = trpc.tools?.delete?.useMutation?.();
 
   // Update tools when query data changes
@@ -115,6 +116,41 @@ export function ToolManagement() {
     }
   };
 
+  const handleEditTool = (tool: Tool) => {
+    setEditingTool(tool);
+    setFormData({
+      name: tool.name,
+      description: tool.description,
+      category: tool.category,
+      complexity: tool.complexity,
+      implementation_type: tool.implementation_type || 'javascript',
+      python_script: tool.python_script || '',
+      agent_ids: [],
+    });
+    setIsEditDialogOpen(true);
+  };
+
+  const handleUpdateTool = async () => {
+    if (!editingTool || !formData.name.trim() || !formData.description.trim()) return;
+
+    try {
+      await updateMutation?.mutateAsync?.({
+        toolId: editingTool.tool_id,
+        name: formData.name,
+        description: formData.description,
+        category: formData.category as any,
+        complexity: formData.complexity as any,
+      });
+
+      setIsEditDialogOpen(false);
+      setEditingTool(null);
+      resetForm();
+      utils?.tools?.list?.invalidate?.();
+    } catch (error) {
+      console.error('Error updating tool:', error);
+    }
+  };
+
   const handleDeleteTool = async (toolId: string) => {
     if (!window.confirm('Are you sure you want to delete this tool?')) return;
 
@@ -141,7 +177,6 @@ export function ToolManagement() {
     setIsLoadingChat(true);
 
     try {
-      // Simulate tool agent response
       const assistantMessage: Message = {
         id: `msg_${Date.now() + 1}`,
         role: 'assistant',
@@ -422,7 +457,11 @@ export function ToolManagement() {
               >
                 <MessageSquare className="w-4 h-4" />
               </Button>
-              <Button variant="ghost" size="sm">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => handleEditTool(tool)}
+              >
                 <Edit2 className="w-4 h-4" />
               </Button>
               <Button
@@ -447,6 +486,77 @@ export function ToolManagement() {
           </CardContent>
         </Card>
       )}
+
+      {/* Edit Dialog */}
+      <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Edit Tool</DialogTitle>
+            <DialogDescription>Update tool details</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <label className="text-sm font-medium">Tool Name</label>
+              <Input
+                placeholder="e.g., Advanced Demand Forecasting"
+                value={formData.name}
+                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+              />
+            </div>
+
+            <div>
+              <label className="text-sm font-medium">Description</label>
+              <Textarea
+                placeholder="Describe what this tool does..."
+                value={formData.description}
+                onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                rows={3}
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="text-sm font-medium">Category</label>
+                <Select value={formData.category} onValueChange={(v) => setFormData({ ...formData, category: v })}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {categories.map((cat) => (
+                      <SelectItem key={cat} value={cat}>
+                        {cat.charAt(0).toUpperCase() + cat.slice(1)}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div>
+                <label className="text-sm font-medium">Complexity</label>
+                <Select value={formData.complexity} onValueChange={(v) => setFormData({ ...formData, complexity: v })}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {complexities.map((c) => (
+                      <SelectItem key={c} value={c}>
+                        {c.charAt(0).toUpperCase() + c.slice(1)}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            <div className="flex gap-2 justify-end">
+              <Button variant="outline" onClick={() => setIsEditDialogOpen(false)}>
+                Cancel
+              </Button>
+              <Button onClick={handleUpdateTool}>Update Tool</Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {/* Chat Dialog */}
       <Dialog open={isChatOpen} onOpenChange={setIsChatOpen}>
