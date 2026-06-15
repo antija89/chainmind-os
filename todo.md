@@ -165,3 +165,36 @@
 - [x] Support both JavaScript and Python implementations
 - [x] Document Python tools architecture
 - [x] Document tool persistence strategy for production
+
+
+## Phase 17: LLM Tool Creation & Agent Tool-Calling (IN PROGRESS)
+- [ ] Fix LLM JSON parsing for tool generation (handle newlines in code)
+- [ ] Implement real LLM-backed tool creation (not mock)
+- [ ] Add manual code paste option to Create Tool dialog
+- [ ] Show tool preview with sample data execution
+- [x] Fix agent system prompt to use tools proactively
+- [ ] Test agent chat with real tool execution
+- [ ] Verify agents use tools instead of asking clarifying questions
+
+## Phase 18: Remaining Data Tables
+- [ ] Build BOM table view
+- [ ] Build Sales History table view
+- [ ] Build Forecast table view
+- [ ] Build Suppliers table view
+- [ ] Add filtering, sorting, and pagination
+
+## Phase 19: RBAC & Permissions
+- [ ] Implement role-based access control (Admin, Ops Head, Planner)
+- [ ] Add role-based route protection
+- [ ] Create permission matrix
+- [ ] Enforce audit logging for all actions
+
+## Phase 20: S&OP Workflow Engine
+- [ ] Design S&OP workflow state machine
+- [ ] Implement demand planning phase
+- [ ] Implement supply planning phase
+- [ ] Implement production planning phase
+- [ ] Implement procurement planning phase
+- [ ] Implement reconciliation phase
+- [ ] Add workflow visualization
+- [ ] Implement approval gates and escalation

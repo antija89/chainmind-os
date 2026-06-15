@@ -182,6 +182,11 @@ export const agentChatWithToolsRouter = router({
         const toolsData = await getToolsByAgent(input.agentId);
         const tools = Array.isArray(toolsData) ? toolsData : [];
         
+        console.log(`[Agent Chat] Agent: ${input.agentName}, Tools available: ${tools.length}`);
+        if (tools.length > 0) {
+          console.log(`[Agent Chat] Tool names: ${tools.map((t: any) => t.name).join(', ')}`);
+        }
+        
         // Build system prompt with tools
         const systemPrompt = buildSystemPromptWithTools(input.agentName, tools);
 
@@ -192,26 +197,37 @@ export const agentChatWithToolsRouter = router({
         ];
 
         // Call LLM with tools
+        const toolDefinitions = tools.map((t: any) => ({
+          type: 'function' as const,
+          function: {
+            name: t.name || '',
+            description: t.description || '',
+            parameters: t.input_schema || {},
+          },
+        }));
+        
+        console.log(`[Agent Chat] Calling LLM with ${toolDefinitions.length} tools`);
+        
         const response = await invokeLLM({
           messages: [
             { role: 'system', content: systemPrompt },
             ...messages,
           ],
-          tools: tools.map((t: any) => ({
-            type: 'function' as const,
-            function: {
-              name: t.name || '',
-              description: t.description || '',
-              parameters: t.input_schema || {},
-            },
-          })),
-          tool_choice: 'auto',
+          tools: toolDefinitions.length > 0 ? toolDefinitions : undefined,
+          tool_choice: toolDefinitions.length > 0 ? 'required' : undefined,
         });
 
         const choice = response?.choices?.[0];
         const message = choice?.message;
         let assistantContent = typeof message?.content === 'string' ? message.content : '';
         const toolCalls = message?.tool_calls || [];
+        
+        console.log(`[Agent Chat] LLM response - content length: ${assistantContent.length}, tool calls: ${toolCalls.length}`);
+        if (toolCalls.length > 0) {
+          console.log(`[Agent Chat] Tools called: ${toolCalls.map((tc: any) => tc.function?.name).join(', ')}`);
+        } else if (toolDefinitions.length > 0) {
+          console.warn(`[Agent Chat] WARNING: No tools called despite ${toolDefinitions.length} tools available`);
+        }
 
         // Execute tool calls if any
         const toolResults: ToolResult[] = [];
