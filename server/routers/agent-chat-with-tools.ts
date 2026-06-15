@@ -3,6 +3,7 @@ import { invokeLLM } from '../_core/llm';
 import { z } from 'zod';
 import { getToolsByAgent, logToolExecution } from '../db-tools';
 import { saveAgentMessage } from '../db';
+import { logSupervisionEvent } from '../db-supervision';
 
 /**
  * Agent Chat Router with Tool Execution Dispatcher
@@ -280,11 +281,40 @@ export const agentChatWithToolsRouter = router({
           assistantContent = 'I processed your request but did not generate a response. Please try rephrasing your question.';
         }
         
-        // Log response to Reviewer Agent for supervision
+        // Determine response status
+        let responseStatus: 'success' | 'blank' | 'error' | 'incomplete' = 'success';
+        if (!assistantContent.trim()) {
+          responseStatus = 'blank';
+        } else if (assistantContent.length < 20) {
+          responseStatus = 'incomplete';
+        } else if (assistantContent.toLowerCase().includes('error') || assistantContent.toLowerCase().includes('failed')) {
+          responseStatus = 'error';
+        }
+
+        // Log response to Reviewer Agent for supervision with full visibility
         try {
-          console.log(`[Agent Chat] Logging supervision for ${input.agentId}: response length ${assistantContent.length}, tools used ${toolResults.length}`);
-          // Supervision logging will be called from the client after receiving the response
-          // This ensures the Reviewer Agent can track all agent interactions
+          await logSupervisionEvent({
+            agentId: input.agentId,
+            agentName: input.agentName,
+            question: input.message,
+            agentResponse: assistantContent,
+            responseStatus,
+            systemPrompt, // Full system prompt sent to agent
+            agentReasoning: assistantContent, // Agent's response (reasoning)
+            toolsUsed: toolResults.map((t) => t.toolName),
+            toolCalls: toolResults.map((t) => ({
+              name: t.toolName,
+              status: t.status,
+              result: t.result,
+              executionTime: t.executionTime,
+            })),
+            executionDetails: {
+              toolCount: toolResults.length,
+              responseLength: assistantContent.length,
+              timestamp: new Date().toISOString(),
+            },
+          });
+          console.log(`[Agent Chat] Supervision logged for ${input.agentId}: status=${responseStatus}, tools=${toolResults.length}`);
         } catch (supervisionError) {
           console.warn('[Agent Chat] Failed to log supervision:', supervisionError);
         }

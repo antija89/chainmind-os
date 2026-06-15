@@ -1,15 +1,20 @@
-import { useState, useEffect } from 'react';
+'use client';
+
+import { useState } from 'react';
 import { trpc } from '@/lib/trpc';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { AlertCircle, CheckCircle, Clock, AlertTriangle } from 'lucide-react';
+import { AlertCircle, CheckCircle, Clock, AlertTriangle, Eye, Code } from 'lucide-react';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 
 export default function ReviewerAgentDashboard() {
   const [selectedAgent, setSelectedAgent] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
+  const [selectedLog, setSelectedLog] = useState<any>(null);
+  const [showPromptModal, setShowPromptModal] = useState(false);
 
   // Fetch dashboard summary
   const { data: summary } = trpc.reviewerAgent.getDashboardSummary.useQuery();
@@ -63,7 +68,7 @@ export default function ReviewerAgentDashboard() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold">Reviewer Agent Dashboard</h1>
-          <p className="text-gray-600 mt-1">Monitor and review all agent interactions</p>
+          <p className="text-gray-600 mt-1">Monitor and review all agent interactions with full prompt visibility</p>
         </div>
       </div>
 
@@ -106,7 +111,7 @@ export default function ReviewerAgentDashboard() {
       <Card>
         <CardHeader>
           <CardTitle>Select Agent to Review</CardTitle>
-          <CardDescription>Choose an agent to view detailed interactions and guidance</CardDescription>
+          <CardDescription>Choose an agent to view detailed interactions and prompts</CardDescription>
         </CardHeader>
         <CardContent>
           <div className="flex flex-wrap gap-2">
@@ -115,26 +120,29 @@ export default function ReviewerAgentDashboard() {
                 key={agent.agentId}
                 variant={selectedAgent === agent.agentId ? 'default' : 'outline'}
                 onClick={() => setSelectedAgent(agent.agentId)}
-                className="capitalize"
+                className="relative"
               >
-                {agent.agentId.replace(/-/g, ' ')}
-                <Badge className="ml-2 bg-blue-100 text-blue-800">{agent.interactionCount}</Badge>
+                {agent.agentId}
+                <Badge variant="secondary" className="ml-2">
+                  {agent.interactionCount}
+                </Badge>
               </Button>
             ))}
           </div>
         </CardContent>
       </Card>
 
-      {/* Detailed View */}
+      {/* Tabs for Interactions, Conversations, Guidance, and Reasoning */}
       {selectedAgent && (
         <Tabs defaultValue="interactions" className="w-full">
-          <TabsList>
+          <TabsList className="grid w-full grid-cols-4">
             <TabsTrigger value="interactions">Interactions</TabsTrigger>
             <TabsTrigger value="conversations">Conversations</TabsTrigger>
             <TabsTrigger value="guidance">Guidance</TabsTrigger>
+            <TabsTrigger value="reasoning">Reasoning</TabsTrigger>
           </TabsList>
 
-          {/* Interactions Tab */}
+          {/* Interactions Tab - with Prompt Visibility */}
           <TabsContent value="interactions">
             <Card>
               <CardHeader>
@@ -155,12 +163,28 @@ export default function ReviewerAgentDashboard() {
                             </Badge>
                           </div>
                           <p className="text-sm text-gray-600 line-clamp-2">{log.agentResponse}</p>
-                          {log.opsHeadIntervention && (
-                            <div className="mt-2 p-2 bg-yellow-50 rounded text-sm">
-                              <strong>Reviewer Guidance:</strong> {log.opsHeadGuidance}
+                          {log.toolsUsed && log.toolsUsed.length > 0 && (
+                            <div className="mt-2 flex flex-wrap gap-1">
+                              {log.toolsUsed.map((tool: string, idx: number) => (
+                                <Badge key={idx} variant="outline" className="text-xs">
+                                  {tool}
+                                </Badge>
+                              ))}
                             </div>
                           )}
                         </div>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => {
+                            setSelectedLog(log);
+                            setShowPromptModal(true);
+                          }}
+                          className="ml-2"
+                        >
+                          <Eye className="w-4 h-4 mr-1" />
+                          View Prompt
+                        </Button>
                       </div>
                       <div className="text-xs text-gray-500 mt-2">
                         {new Date(log.createdAt).toLocaleString()}
@@ -223,30 +247,27 @@ export default function ReviewerAgentDashboard() {
             <Card>
               <CardHeader>
                 <CardTitle>Reviewer Guidance</CardTitle>
-                <CardDescription>Guidance provided to {selectedAgent}</CardDescription>
+                <CardDescription>Guidance records for {selectedAgent}</CardDescription>
               </CardHeader>
               <CardContent>
                 <div className="space-y-4">
                   {guidance?.map((g: any) => (
-                    <div key={g.guidanceId} className="border rounded-lg p-4 bg-blue-50">
+                    <div key={g.guidanceId} className="border rounded-lg p-4">
                       <div className="flex items-start justify-between mb-2">
-                        <Badge className="bg-blue-600">{g.guidanceType}</Badge>
+                        <div>
+                          <Badge>{g.guidanceType}</Badge>
+                          <Badge variant="outline" className="ml-2">
+                            {g.guidanceAction}
+                          </Badge>
+                        </div>
                         <Badge variant={g.resolved ? 'default' : 'secondary'}>
                           {g.resolved ? 'Resolved' : 'Pending'}
                         </Badge>
                       </div>
-                      <div className="mb-2">
-                        <strong className="text-sm">Guidance:</strong>
-                        <p className="text-sm text-gray-700 mt-1">{g.guidanceText}</p>
-                      </div>
-                      <div className="mb-2">
-                        <strong className="text-sm">Suggested Action:</strong>
-                        <p className="text-sm text-gray-700 mt-1 capitalize">{g.guidanceAction}</p>
-                      </div>
+                      <p className="text-sm font-medium mb-2">{g.guidanceText}</p>
                       {g.agentResponseAfterGuidance && (
-                        <div>
-                          <strong className="text-sm">Agent Response:</strong>
-                          <p className="text-sm text-gray-700 mt-1">{g.agentResponseAfterGuidance}</p>
+                        <div className="mt-2 p-2 bg-blue-50 rounded text-sm">
+                          <strong>Agent Response:</strong> {g.agentResponseAfterGuidance}
                         </div>
                       )}
                       <div className="text-xs text-gray-500 mt-2">
@@ -256,7 +277,80 @@ export default function ReviewerAgentDashboard() {
                   ))}
                   {!guidance || guidance.length === 0 && (
                     <div className="text-center py-8 text-gray-500">
-                      No pending guidance
+                      No guidance records yet
+                    </div>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* Reasoning Tab - Shows Tool Calls and Execution Details */}
+          <TabsContent value="reasoning">
+            <Card>
+              <CardHeader>
+                <CardTitle>Agent Reasoning & Tool Execution</CardTitle>
+                <CardDescription>Internal reasoning and tool calls for {selectedAgent}</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  {logs?.map((log: any) => (
+                    <div key={log.supervisionId} className="border rounded-lg p-4">
+                      <div className="mb-2">
+                        <span className="font-medium">{log.question}</span>
+                        <Badge className={`ml-2 ${getStatusBadge(log.responseStatus)}`}>
+                          {log.responseStatus}
+                        </Badge>
+                      </div>
+
+                      {/* Tool Calls */}
+                      {log.toolCalls && log.toolCalls.length > 0 && (
+                        <div className="mt-3 p-3 bg-gray-50 rounded">
+                          <div className="font-medium text-sm mb-2 flex items-center">
+                            <Code className="w-4 h-4 mr-2" />
+                            Tool Calls ({log.toolCalls.length})
+                          </div>
+                          <div className="space-y-2">
+                            {log.toolCalls.map((tool: any, idx: number) => (
+                              <div key={idx} className="text-xs bg-white p-2 rounded border">
+                                <div className="font-mono font-bold">{tool.name}</div>
+                                <div className="text-gray-600">Status: {tool.status}</div>
+                                {tool.executionTime && (
+                                  <div className="text-gray-600">Time: {tool.executionTime}ms</div>
+                                )}
+                                {tool.result && (
+                                  <div className="mt-1 text-gray-700 max-h-32 overflow-y-auto">
+                                    <pre className="text-xs">{JSON.stringify(tool.result, null, 2)}</pre>
+                                  </div>
+                                )}
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Execution Details */}
+                      {log.executionDetails && (
+                        <div className="mt-3 p-3 bg-blue-50 rounded text-xs">
+                          <div className="font-medium mb-2">Execution Details</div>
+                          <div className="space-y-1 text-gray-700">
+                            <div>Tools Used: {log.executionDetails.toolCount || 0}</div>
+                            <div>Response Length: {log.executionDetails.responseLength || 0} chars</div>
+                            {log.executionDetails.timestamp && (
+                              <div>Timestamp: {new Date(log.executionDetails.timestamp).toLocaleString()}</div>
+                            )}
+                          </div>
+                        </div>
+                      )}
+
+                      <div className="text-xs text-gray-500 mt-2">
+                        {new Date(log.createdAt).toLocaleString()}
+                      </div>
+                    </div>
+                  ))}
+                  {!logs || logs.length === 0 && (
+                    <div className="text-center py-8 text-gray-500">
+                      No reasoning data available
                     </div>
                   )}
                 </div>
@@ -266,53 +360,52 @@ export default function ReviewerAgentDashboard() {
         </Tabs>
       )}
 
-      {/* Agent Stats */}
-      {summary?.agentStats && (
-        <Card>
-          <CardHeader>
-            <CardTitle>Agent Performance Metrics</CardTitle>
-            <CardDescription>Quality metrics for all monitored agents</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b">
-                    <th className="text-left py-2 px-2">Agent</th>
-                    <th className="text-center py-2 px-2">Total</th>
-                    <th className="text-center py-2 px-2">Success</th>
-                    <th className="text-center py-2 px-2">Blank</th>
-                    <th className="text-center py-2 px-2">Error</th>
-                    <th className="text-center py-2 px-2">Incomplete</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {summary.agentStats.map((agent: any) => (
-                    <tr key={agent.agentId} className="border-b hover:bg-gray-50">
-                      <td className="py-2 px-2 capitalize">{agent.agentId.replace(/-/g, ' ')}</td>
-                      <td className="text-center py-2 px-2">{agent.interactionCount}</td>
-                      <td className="text-center py-2 px-2">
-                        <Badge className="bg-green-100 text-green-800">
-                          {agent.interactionCount - (agent.blankResponses + agent.errorResponses + agent.incompleteResponses)}
-                        </Badge>
-                      </td>
-                      <td className="text-center py-2 px-2">
-                        <Badge className="bg-yellow-100 text-yellow-800">{agent.blankResponses}</Badge>
-                      </td>
-                      <td className="text-center py-2 px-2">
-                        <Badge className="bg-red-100 text-red-800">{agent.errorResponses}</Badge>
-                      </td>
-                      <td className="text-center py-2 px-2">
-                        <Badge className="bg-orange-100 text-orange-800">{agent.incompleteResponses}</Badge>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+      {/* Prompt Visibility Modal */}
+      <Dialog open={showPromptModal} onOpenChange={setShowPromptModal}>
+        <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Complete Prompt & Response</DialogTitle>
+            <DialogDescription>
+              Full system prompt and agent reasoning for: {selectedLog?.question}
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            {/* System Prompt */}
+            <div className="border rounded-lg p-4 bg-gray-50">
+              <h3 className="font-bold mb-2 flex items-center">
+                <Code className="w-4 h-4 mr-2" />
+                System Prompt
+              </h3>
+              <pre className="text-xs bg-white p-3 rounded border overflow-x-auto max-h-48">
+                {selectedLog?.systemPrompt || 'No system prompt captured'}
+              </pre>
             </div>
-          </CardContent>
-        </Card>
-      )}
+
+            {/* User Question */}
+            <div className="border rounded-lg p-4 bg-blue-50">
+              <h3 className="font-bold mb-2">User Question</h3>
+              <p className="text-sm">{selectedLog?.question}</p>
+            </div>
+
+            {/* Agent Response */}
+            <div className="border rounded-lg p-4 bg-green-50">
+              <h3 className="font-bold mb-2">Agent Response</h3>
+              <p className="text-sm">{selectedLog?.agentResponse}</p>
+            </div>
+
+            {/* Tool Calls */}
+            {selectedLog?.toolCalls && selectedLog.toolCalls.length > 0 && (
+              <div className="border rounded-lg p-4 bg-yellow-50">
+                <h3 className="font-bold mb-2">Tool Calls</h3>
+                <pre className="text-xs bg-white p-3 rounded border overflow-x-auto max-h-48">
+                  {JSON.stringify(selectedLog.toolCalls, null, 2)}
+                </pre>
+              </div>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

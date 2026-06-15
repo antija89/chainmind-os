@@ -4,7 +4,7 @@ import { nanoid } from 'nanoid';
 import { eq, and, desc } from 'drizzle-orm';
 
 /**
- * Log an agent response for supervision
+ * Log an agent response for supervision with full prompt and reasoning visibility
  */
 export async function logSupervisionEvent(data: {
   agentId: string;
@@ -12,7 +12,10 @@ export async function logSupervisionEvent(data: {
   question: string;
   agentResponse: string;
   responseStatus: 'success' | 'blank' | 'error' | 'incomplete';
+  systemPrompt?: string;
+  agentReasoning?: string;
   toolsUsed?: string[];
+  toolCalls?: any[];
   executionDetails?: Record<string, any>;
 }) {
   const supervisionId = `sup-${nanoid()}`;
@@ -26,9 +29,12 @@ export async function logSupervisionEvent(data: {
       agentId: data.agentId,
       agentName: data.agentName,
       question: data.question,
+      systemPrompt: data.systemPrompt,
       agentResponse: data.agentResponse,
+      agentReasoning: data.agentReasoning,
       responseStatus: data.responseStatus,
       toolsUsed: data.toolsUsed || [],
+      toolCalls: data.toolCalls || [],
       executionDetails: data.executionDetails || {},
       needsReview,
       createdAt: new Date(),
@@ -148,7 +154,7 @@ export async function logConversation(data: {
 }
 
 /**
- * Get supervision logs for an agent
+ * Get supervision logs for an agent with all details
  */
 export async function getSupervisionLogs(
   agentId?: string,

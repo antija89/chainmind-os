@@ -208,7 +208,22 @@
 - [x] Test complete supervision workflow: blank response → guidance → resolution
 - [x] Verify dashboard displays real data from database
 
-## Phase 19: Wire Agent Chat to Reviewer Supervision (NEXT)
+## Phase 19: Real-Time Supervision Logging with Prompt Visibility (COMPLETED)
+- [x] Add system_prompt field to supervision_logs table
+- [x] Add agent_reasoning field to supervision_logs table
+- [x] Add tool_calls field to supervision_logs table
+- [x] Update db-supervision.ts to store complete prompts and reasoning
+- [x] Wire agent-chat-with-tools to call logSupervisionEvent with full prompt
+- [x] Detect response status (success/blank/error/incomplete) automatically
+- [x] Store tool call details with execution time and results
+- [x] Add "View Prompt" button to Reviewer Dashboard
+- [x] Create prompt visibility modal showing complete system prompt + user question + response
+- [x] Add "Reasoning" tab showing tool calls and execution details
+- [x] Create comprehensive real-time supervision tests (9 tests, all passing)
+- [x] Verify dashboard displays real data from actual agent interactions
+- [x] Test complete workflow with real supervision logging
+
+## Phase 20: Wire Agent Chat to Reviewer Supervision (NEXT)
 - [ ] Call reviewerAgent.logAgentResponse after every agent chat response
 - [ ] Automatically trigger guidance when blank/error detected
 - [ ] Display guidance in agent chat UI

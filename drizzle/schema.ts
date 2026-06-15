@@ -380,9 +380,12 @@ export const supervisionLogs = mysqlTable("supervision_logs", {
   agentId: varchar("agent_id", { length: 64 }).notNull(),
   agentName: varchar("agent_name", { length: 255 }),
   question: text("question"),
+  systemPrompt: text("system_prompt"), // Complete system prompt sent to agent
   agentResponse: text("agent_response"),
+  agentReasoning: text("agent_reasoning"), // Internal reasoning/thoughts from agent
   responseStatus: mysqlEnum("response_status", ["success", "blank", "error", "incomplete"]).default("success"),
   toolsUsed: json("tools_used"), // Array of tool names used
+  toolCalls: json("tool_calls"), // Detailed tool call information
   executionDetails: json("execution_details"), // Metadata about execution
   needsReview: boolean("needs_review").default(false),
   createdAt: timestamp("created_at").defaultNow(),
