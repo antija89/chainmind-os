@@ -189,6 +189,40 @@
 - [ ] Create permission matrix
 - [ ] Enforce audit logging for all actions
 
+## Phase 18: Reviewer Agent Supervision System (COMPLETED)
+- [x] Create supervision_logs table schema with response status tracking
+- [x] Create agent_guidance table schema with guidance types and actions
+- [x] Create conversation_logs table schema for audit trail
+- [x] Create database helpers (db-supervision.ts) for persistence
+- [x] Implement logSupervisionEvent to detect blank/incomplete/error responses
+- [x] Implement automatic guidance triggering for problematic responses
+- [x] Create guidance system with resolution tracking
+- [x] Build conversation logging infrastructure
+- [x] Create Reviewer Agent dashboard UI with agent selection and metrics
+- [x] Register Reviewer Agent router in main routers.ts
+- [x] Add Reviewer Dashboard route to App.tsx
+- [x] Add Reviewer Dashboard link to sidebar navigation with Eye icon
+- [x] Update reviewer-agent-supervision router with real DB queries
+- [x] Remove mock data and implement real database persistence
+- [x] Create comprehensive end-to-end tests (14 tests, all passing)
+- [x] Test complete supervision workflow: blank response → guidance → resolution
+- [x] Verify dashboard displays real data from database
+
+## Phase 19: Wire Agent Chat to Reviewer Supervision (NEXT)
+- [ ] Call reviewerAgent.logAgentResponse after every agent chat response
+- [ ] Automatically trigger guidance when blank/error detected
+- [ ] Display guidance in agent chat UI
+- [ ] Allow agents to acknowledge and respond to guidance
+- [ ] Track guidance resolution in agent workflow
+
+## Phase 20: On-Demand Tool Creation
+- [ ] Integrate tool-creation-on-demand router into main routers
+- [ ] Detect when agent lacks tool for a question
+- [ ] Trigger LLM tool generation automatically
+- [ ] Save generated tool to database
+- [ ] Execute tool and return result to agent
+- [ ] Log tool creation event in audit trail
+
 ## Phase 20: S&OP Workflow Engine
 - [ ] Design S&OP workflow state machine
 - [ ] Implement demand planning phase

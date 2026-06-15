@@ -372,3 +372,51 @@ export const toolExecutionLog = mysqlTable("tool_execution_log", {
 
 export type ToolExecutionLog = typeof toolExecutionLog.$inferSelect;
 export type InsertToolExecutionLog = typeof toolExecutionLog.$inferInsert;
+
+// ============ REVIEWER AGENT SUPERVISION TABLES ============
+
+export const supervisionLogs = mysqlTable("supervision_logs", {
+  supervisionId: varchar("supervision_id", { length: 64 }).primaryKey(),
+  agentId: varchar("agent_id", { length: 64 }).notNull(),
+  agentName: varchar("agent_name", { length: 255 }),
+  question: text("question"),
+  agentResponse: text("agent_response"),
+  responseStatus: mysqlEnum("response_status", ["success", "blank", "error", "incomplete"]).default("success"),
+  toolsUsed: json("tools_used"), // Array of tool names used
+  executionDetails: json("execution_details"), // Metadata about execution
+  needsReview: boolean("needs_review").default(false),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export type SupervisionLog = typeof supervisionLogs.$inferSelect;
+export type InsertSupervisionLog = typeof supervisionLogs.$inferInsert;
+
+export const agentGuidance = mysqlTable("agent_guidance", {
+  guidanceId: varchar("guidance_id", { length: 64 }).primaryKey(),
+  supervisionId: varchar("supervision_id", { length: 64 }).notNull(),
+  agentId: varchar("agent_id", { length: 64 }).notNull(),
+  guidanceType: mysqlEnum("guidance_type", ["clarification", "correction", "suggestion", "escalation"]).notNull(),
+  guidanceText: text("guidance_text").notNull(),
+  guidanceAction: mysqlEnum("guidance_action", ["retry", "create_tool", "escalate", "manual_input"]).notNull(),
+  resolved: boolean("resolved").default(false),
+  agentResponseAfterGuidance: text("agent_response_after_guidance"),
+  createdAt: timestamp("created_at").defaultNow(),
+  resolvedAt: timestamp("resolved_at"),
+});
+
+export type AgentGuidance = typeof agentGuidance.$inferSelect;
+export type InsertAgentGuidance = typeof agentGuidance.$inferInsert;
+
+export const conversationLogs = mysqlTable("conversation_logs", {
+  conversationId: varchar("conversation_id", { length: 64 }).primaryKey(),
+  agentId: varchar("agent_id", { length: 64 }).notNull(),
+  supervisionId: varchar("supervision_id", { length: 64 }),
+  userMessage: text("user_message"),
+  agentMessage: text("agent_message"),
+  conversationType: mysqlEnum("conversation_type", ["user_to_agent", "agent_to_reviewer", "reviewer_to_agent", "agent_to_agent"]).notNull(),
+  metadata: json("metadata"), // Additional context
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export type ConversationLog = typeof conversationLogs.$inferSelect;
+export type InsertConversationLog = typeof conversationLogs.$inferInsert;

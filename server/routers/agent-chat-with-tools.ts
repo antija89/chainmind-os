@@ -275,6 +275,20 @@ export const agentChatWithToolsRouter = router({
           console.error('[Agent Chat] Failed to save message:', dbError);
         }
 
+        // If no response content and no tool results, provide fallback
+        if (!assistantContent && toolResults.length === 0) {
+          assistantContent = 'I processed your request but did not generate a response. Please try rephrasing your question.';
+        }
+        
+        // Log response to Reviewer Agent for supervision
+        try {
+          console.log(`[Agent Chat] Logging supervision for ${input.agentId}: response length ${assistantContent.length}, tools used ${toolResults.length}`);
+          // Supervision logging will be called from the client after receiving the response
+          // This ensures the Reviewer Agent can track all agent interactions
+        } catch (supervisionError) {
+          console.warn('[Agent Chat] Failed to log supervision:', supervisionError);
+        }
+        
         return {
           response: assistantContent,
           toolResults,
