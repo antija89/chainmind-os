@@ -139,8 +139,8 @@ const normalizeContentPart = (
   throw new Error("Unsupported message content part");
 };
 
-const normalizeMessage = (message: Message) => {
-  const { role, name, tool_call_id } = message;
+const normalizeMessage = (message: Message & { tool_calls?: ToolCall[] }) => {
+  const { role, name, tool_call_id, tool_calls } = message;
 
   if (role === "tool" || role === "function") {
     const content = ensureArray(message.content)
@@ -163,6 +163,8 @@ const normalizeMessage = (message: Message) => {
       role,
       name,
       content: contentParts[0].text,
+      // Preserve tool_calls for assistant messages (needed for multi-turn tool calling)
+      ...(tool_calls ? { tool_calls } : {}),
     };
   }
 
@@ -170,6 +172,7 @@ const normalizeMessage = (message: Message) => {
     role,
     name,
     content: contentParts,
+    ...(tool_calls ? { tool_calls } : {}),
   };
 };
 
@@ -358,8 +361,13 @@ export async function invokeLLM(params: InvokeParams): Promise<InvokeResult> {
     max_tokens,
   } = params;
 
+  const normalizedMessages = messages.map(normalizeMessage);
+  // Debug: log if any assistant message has tool_calls stripped
+  if (process.env.DEBUG_LLM) {
+    console.log('[LLM] Sending messages:', JSON.stringify(normalizedMessages.slice(0, 3)));
+  }
   const payload: Record<string, unknown> = {
-    messages: messages.map(normalizeMessage),
+    messages: normalizedMessages,
   };
 
   if (model) {

@@ -4,6 +4,7 @@ import { z } from 'zod';
 import { getToolsByAgent, logToolExecution } from '../db-tools';
 import { saveAgentMessage, writeAuditLog } from '../db';
 import { logSupervisionEvent } from '../db-supervision';
+import { orchestrateWithReviewer } from '../reviewer-orchestrator';
 import { getDb } from '../db';
 import { salesHistory, inventory, forecast, fgMaster } from '../../drizzle/schema';
 import { desc, sql, eq } from 'drizzle-orm';
@@ -679,11 +680,76 @@ export const agentChatWithToolsRouter = router({
           console.warn('[Reviewer] Failed to log supervision:', supervisionError);
         }
 
+        // ─── Reviewer Agent Orchestration ─────────────────────────────────────
+        // The Reviewer evaluates quality, provides guidance, and retries if needed
+        let finalResponse = assistantContent;
+        let interAgentMessages: unknown[] = [];
+        let wasRetried = false;
+
+        try {
+          const availableToolNames = mergedTools.map((t: any) => t.name || t.toolId);
+          const orchestratorResult = await orchestrateWithReviewer({
+            agentId: input.agentId,
+            agentName: input.agentName,
+            userQuestion: input.message,
+            agentResponse: assistantContent,
+            toolResults,
+            availableTools: availableToolNames,
+            systemPrompt,
+            sessionId: messageId,
+            retryFn: async (guidanceText: string) => {
+              // Build a guided retry prompt
+              const guidedMessages = [
+                { role: 'system' as const, content: systemPrompt + `\n\n---\nREVIEWER GUIDANCE:\n${guidanceText}\n\nFollow this guidance carefully in your response.` },
+                ...(input.conversationHistory || []).map(h => ({ role: h.role as 'user' | 'assistant', content: h.content })),
+                { role: 'user' as const, content: input.message },
+              ];
+              const retryLLMResponse = await invokeLLM({
+                messages: guidedMessages,
+                tools: toolDefinitions,
+                tool_choice: 'auto',
+              });
+              const retryChoice = retryLLMResponse?.choices?.[0];
+              const retryContent = retryChoice?.message?.content;
+              const retryToolCalls = retryChoice?.message?.tool_calls || [];
+              const retryToolResults: ToolResult[] = [];
+
+              // Execute any tool calls from retry
+              for (const tc of retryToolCalls) {
+                if (tc.function?.name) {
+                  const args = (() => { try { return JSON.parse(tc.function.arguments || '{}'); } catch { return {}; } })();
+                  const dbTool = mergedTools.find((t: any) => (t.name || t.toolId) === tc.function.name);
+                  const result = await executeTool(tc.function.name, args, dbTool);
+                  retryToolResults.push(result);
+                }
+              }
+
+              const retryResponseText = typeof retryContent === 'string' ? retryContent :
+                (retryToolResults.length > 0 ? retryToolResults.map(r => JSON.stringify(r.result)).join('\n') : assistantContent);
+
+              return { response: retryResponseText || assistantContent, toolResults: retryToolResults };
+            },
+          });
+
+          finalResponse = orchestratorResult.finalResponse;
+          interAgentMessages = orchestratorResult.interAgentMessages;
+          wasRetried = orchestratorResult.wasRetried;
+
+          if (wasRetried) {
+            console.log(`[ReviewerOrchestrator] Agent ${input.agentId} was retried. Score: ${orchestratorResult.reviewerEvaluation.score}`);
+          }
+        } catch (orchError) {
+          console.warn('[ReviewerOrchestrator] Orchestration failed, using original response:', orchError);
+          finalResponse = assistantContent;
+        }
+
         return {
-          response: assistantContent,
+          response: finalResponse,
           toolResults,
           toolsUsed: toolResults.map(t => t.toolName),
           success: true,
+          wasRetried,
+          interAgentMessages,
         };
       } catch (error) {
         console.error('[Agent Chat with Tools] Error:', error);

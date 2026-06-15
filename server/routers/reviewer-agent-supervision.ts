@@ -10,6 +10,7 @@ import {
   getConversationHistory,
   getSupervisionDashboardSummary,
 } from '../db-supervision';
+import { getInterAgentConversations, getReviewerStats } from '../reviewer-orchestrator';
 
 /**
  * Reviewer Agent Supervision Router
@@ -231,6 +232,46 @@ export const reviewerAgentSupervisionRouter = {
         pendingGuidance: 0,
         agentStats: [],
       };
+    }
+  }),
+
+  /**
+   * Get inter-agent conversations (Reviewer ↔ Agent dialogue)
+   * Shows all reviewer evaluations, guidance, retries, and resolutions
+   */
+  getInterAgentConversations: protectedProcedure
+    .input(
+      z.object({
+        sessionId: z.string().optional(),
+        agentId: z.string().optional(),
+        limit: z.number().optional().default(100),
+      })
+    )
+    .query(async ({ input }) => {
+      try {
+        const conversations = await getInterAgentConversations({
+          sessionId: input.sessionId,
+          agentId: input.agentId,
+          limit: input.limit,
+        });
+        return conversations;
+      } catch (error) {
+        console.error('[Reviewer Agent] Error fetching inter-agent conversations:', error);
+        return [];
+      }
+    }),
+
+  /**
+   * Get reviewer statistics
+   * Shows total reviews, interventions, tool requests, and resolutions
+   */
+  getReviewerStats: protectedProcedure.query(async () => {
+    try {
+      const stats = await getReviewerStats();
+      return stats;
+    } catch (error) {
+      console.error('[Reviewer Agent] Error fetching reviewer stats:', error);
+      return { totalReviews: 0, interventions: 0, toolRequests: 0, resolutions: 0, avgScore: 0 };
     }
   }),
 };
