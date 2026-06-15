@@ -5,262 +5,208 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toast } from 'sonner';
-import { Loader2, Save, CheckCircle } from 'lucide-react';
+import { Loader2, Save, CheckCircle, ExternalLink } from 'lucide-react';
+import { trpc } from '@/lib/trpc';
+
+const PROVIDERS = {
+  gemini: {
+    label: '🔵 Google Gemini',
+    description: 'Google Gemini API — Fast and cost-effective',
+    defaultModel: 'gemini-2.0-flash',
+    docsLabel: 'Google AI Studio',
+    docsUrl: 'https://aistudio.google.com/apikey',
+  },
+  openai: {
+    label: '⚫ OpenAI (GPT)',
+    description: 'OpenAI GPT models — Powerful and reliable',
+    defaultModel: 'gpt-4o',
+    docsLabel: 'OpenAI Platform',
+    docsUrl: 'https://platform.openai.com/api-keys',
+  },
+  anthropic: {
+    label: '🟠 Anthropic (Claude)',
+    description: 'Anthropic Claude — Advanced reasoning',
+    defaultModel: 'claude-3-5-sonnet-20241022',
+    docsLabel: 'Anthropic Console',
+    docsUrl: 'https://console.anthropic.com/settings/keys',
+  },
+  custom: {
+    label: '⚙️ Custom Endpoint',
+    description: 'Any OpenAI-compatible LLM endpoint',
+    defaultModel: '',
+    docsLabel: 'Your provider docs',
+    docsUrl: '#',
+  },
+} as const;
+
+type Provider = keyof typeof PROVIDERS;
 
 export default function Settings() {
-  const [provider, setProvider] = useState('gemini');
+  const [provider, setProvider] = useState<Provider>('gemini');
   const [apiKey, setApiKey] = useState('');
   const [apiUrl, setApiUrl] = useState('');
-  const [model, setModel] = useState('');
-  const [loading, setLoading] = useState(false);
+  const [model, setModel] = useState('gemini-2.0-flash');
   const [saved, setSaved] = useState(false);
 
-  // Load settings from localStorage on mount
+  const saveMutation = trpc.settings.saveLlmConfig.useMutation({
+    onSuccess: () => {
+      // Also persist to localStorage so the UI survives a page refresh
+      localStorage.setItem('llm_settings', JSON.stringify({ provider, apiKey, apiUrl, model }));
+      setSaved(true);
+      toast.success('LLM settings saved! Agents will now use your configured provider.');
+      setTimeout(() => setSaved(false), 3000);
+    },
+    onError: (err) => {
+      toast.error(`Failed to save: ${err.message}`);
+    },
+  });
+
+  // Load from localStorage on mount
   useEffect(() => {
-    const savedSettings = localStorage.getItem('llm_settings');
-    if (savedSettings) {
+    const raw = localStorage.getItem('llm_settings');
+    if (raw) {
       try {
-        const settings = JSON.parse(savedSettings);
-        setProvider(settings.provider || 'gemini');
-        setApiKey(settings.apiKey || '');
-        setApiUrl(settings.apiUrl || '');
-        setModel(settings.model || '');
-      } catch (e) {
-        console.error('Failed to load settings:', e);
-      }
+        const s = JSON.parse(raw);
+        if (s.provider) setProvider(s.provider as Provider);
+        if (s.apiKey) setApiKey(s.apiKey);
+        if (s.apiUrl) setApiUrl(s.apiUrl);
+        if (s.model) setModel(s.model);
+      } catch { /* ignore */ }
     }
   }, []);
 
-  // Update model when provider changes
-  useEffect(() => {
-    const defaultModels: Record<string, string> = {
-      gemini: 'gemini-2.0-flash',
-      openai: 'gpt-4',
-      anthropic: 'claude-3-5-sonnet-20241022',
-      custom: '',
-    };
-    setModel(defaultModels[provider] || '');
-  }, [provider]);
-
-  const handleSave = async () => {
-    if (!apiKey.trim()) {
-      toast.error('Please enter an API key');
-      return;
-    }
-
-    if (provider === 'custom' && !apiUrl.trim()) {
-      toast.error('Please enter API URL for custom provider');
-      return;
-    }
-
-    if (!model.trim()) {
-      toast.error('Please enter a model name');
-      return;
-    }
-
-    setLoading(true);
-    try {
-      // Save to localStorage
-      const settings = {
-        provider,
-        apiKey,
-        apiUrl,
-        model,
-      };
-      localStorage.setItem('llm_settings', JSON.stringify(settings));
-
-      // Also save to backend via API
-      const response = await fetch('/api/trpc/settings.saveLlmConfig', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(settings),
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to save settings');
-      }
-
-      setSaved(true);
-      toast.success('LLM settings saved successfully!');
-      setTimeout(() => setSaved(false), 3000);
-    } catch (error) {
-      console.error('Error saving settings:', error);
-      toast.error('Failed to save settings. Check console for details.');
-    } finally {
-      setLoading(false);
-    }
+  // Auto-fill default model when provider changes
+  const handleProviderChange = (val: Provider) => {
+    setProvider(val);
+    setModel(PROVIDERS[val].defaultModel);
   };
 
-  const providerInfo: Record<string, { description: string; defaultModel: string; docs: string }> = {
-    gemini: {
-      description: 'Google Gemini API - Fast and cost-effective',
-      defaultModel: 'gemini-2.0-flash',
-      docs: 'https://ai.google.dev',
-    },
-    openai: {
-      description: 'OpenAI GPT models - Powerful and reliable',
-      defaultModel: 'gpt-4',
-      docs: 'https://platform.openai.com',
-    },
-    anthropic: {
-      description: 'Anthropic Claude - Advanced reasoning',
-      defaultModel: 'claude-3-5-sonnet-20241022',
-      docs: 'https://console.anthropic.com',
-    },
-    custom: {
-      description: 'Custom LLM endpoint - Use any provider',
-      defaultModel: 'your-model-name',
-      docs: '#',
-    },
+  const handleSave = () => {
+    if (!apiKey.trim()) { toast.error('Please enter an API key'); return; }
+    if (provider === 'custom' && !apiUrl.trim()) { toast.error('Please enter the API endpoint URL'); return; }
+    if (!model.trim()) { toast.error('Please enter a model name'); return; }
+
+    saveMutation.mutate({
+      provider,
+      apiKey: apiKey.trim(),
+      apiUrl: apiUrl.trim() || undefined,
+      model: model.trim(),
+    });
   };
 
-  const info = providerInfo[provider];
+  const info = PROVIDERS[provider];
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 max-w-2xl">
       <div>
         <h1 className="text-3xl font-bold">Settings</h1>
-        <p className="text-muted-foreground mt-2">Configure your LLM provider for agent responses</p>
+        <p className="text-muted-foreground mt-1">Configure the LLM provider used by all agents</p>
       </div>
 
       <Card>
         <CardHeader>
           <CardTitle>LLM Provider Configuration</CardTitle>
-          <CardDescription>Choose your LLM provider and enter your API credentials</CardDescription>
+          <CardDescription>
+            Choose your provider, enter your API key, and save. All five agents will immediately use this configuration.
+          </CardDescription>
         </CardHeader>
-        <CardContent className="space-y-6">
-          {/* Provider Selection */}
-          <div className="space-y-3">
-            <Label htmlFor="provider" className="text-base font-semibold">
-              LLM Provider
-            </Label>
-            <Select value={provider} onValueChange={setProvider}>
-              <SelectTrigger id="provider" className="w-full">
+        <CardContent className="space-y-5">
+
+          {/* Provider */}
+          <div className="space-y-2">
+            <Label className="font-semibold">LLM Provider</Label>
+            <Select value={provider} onValueChange={(v) => handleProviderChange(v as Provider)}>
+              <SelectTrigger>
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="gemini">
-                  <span className="flex items-center gap-2">
-                    🔵 Google Gemini
-                  </span>
-                </SelectItem>
-                <SelectItem value="openai">
-                  <span className="flex items-center gap-2">
-                    ⚫ OpenAI (GPT)
-                  </span>
-                </SelectItem>
-                <SelectItem value="anthropic">
-                  <span className="flex items-center gap-2">
-                    🟠 Anthropic (Claude)
-                  </span>
-                </SelectItem>
-                <SelectItem value="custom">
-                  <span className="flex items-center gap-2">
-                    ⚙️ Custom Endpoint
-                  </span>
-                </SelectItem>
+                {(Object.keys(PROVIDERS) as Provider[]).map((key) => (
+                  <SelectItem key={key} value={key}>{PROVIDERS[key].label}</SelectItem>
+                ))}
               </SelectContent>
             </Select>
-            <p className="text-sm text-muted-foreground">{info?.description}</p>
+            <p className="text-sm text-muted-foreground">{info.description}</p>
           </div>
 
           {/* API Key */}
-          <div className="space-y-3">
-            <Label htmlFor="apiKey" className="text-base font-semibold">
-              API Key
-            </Label>
+          <div className="space-y-2">
+            <Label className="font-semibold">API Key</Label>
             <Input
-              id="apiKey"
               type="password"
-              placeholder="Enter your API key"
+              placeholder="Paste your API key here"
               value={apiKey}
               onChange={(e) => setApiKey(e.target.value)}
-              className="font-mono"
+              className="font-mono text-sm"
             />
-            <p className="text-sm text-muted-foreground">
-              Get your API key from{' '}
-              <a href={info?.docs} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">
-                {provider === 'gemini' ? 'Google AI Studio' : provider === 'openai' ? 'OpenAI Platform' : provider === 'anthropic' ? 'Anthropic Console' : 'your provider'}
+            <p className="text-sm text-muted-foreground flex items-center gap-1">
+              Get your key from{' '}
+              <a
+                href={info.docsUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-blue-600 hover:underline inline-flex items-center gap-1"
+              >
+                {info.docsLabel} <ExternalLink className="h-3 w-3" />
               </a>
             </p>
           </div>
 
-          {/* Custom API URL (only for custom provider) */}
+          {/* Custom URL (only for custom provider) */}
           {provider === 'custom' && (
-            <div className="space-y-3">
-              <Label htmlFor="apiUrl" className="text-base font-semibold">
-                API Endpoint URL
-              </Label>
+            <div className="space-y-2">
+              <Label className="font-semibold">API Endpoint URL</Label>
               <Input
-                id="apiUrl"
                 type="url"
                 placeholder="https://api.example.com/v1/chat/completions"
                 value={apiUrl}
                 onChange={(e) => setApiUrl(e.target.value)}
               />
-              <p className="text-sm text-muted-foreground">
-                The full URL to your custom LLM endpoint
-              </p>
+              <p className="text-sm text-muted-foreground">Must be an OpenAI-compatible endpoint</p>
             </div>
           )}
 
-          {/* Model Name */}
-          <div className="space-y-3">
-            <Label htmlFor="model" className="text-base font-semibold">
-              Model Name
-            </Label>
+          {/* Model */}
+          <div className="space-y-2">
+            <Label className="font-semibold">Model Name</Label>
             <Input
-              id="model"
               type="text"
-              placeholder={info?.defaultModel}
+              placeholder={info.defaultModel || 'e.g. my-model-v1'}
               value={model}
               onChange={(e) => setModel(e.target.value)}
-              className="font-mono"
+              className="font-mono text-sm"
             />
-            <p className="text-sm text-muted-foreground">
-              Default: <code className="bg-muted px-2 py-1 rounded text-xs">{info?.defaultModel}</code>
-            </p>
+            {info.defaultModel && (
+              <p className="text-sm text-muted-foreground">
+                Recommended: <code className="bg-muted px-1.5 py-0.5 rounded text-xs">{info.defaultModel}</code>
+              </p>
+            )}
           </div>
 
-          {/* Save Button */}
-          <div className="pt-4 flex gap-3">
-            <Button
-              onClick={handleSave}
-              disabled={loading}
-              className="gap-2"
-            >
-              {loading ? (
-                <>
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                  Saving...
-                </>
+          {/* Save */}
+          <div className="pt-2">
+            <Button onClick={handleSave} disabled={saveMutation.isPending} className="gap-2 min-w-[140px]">
+              {saveMutation.isPending ? (
+                <><Loader2 className="h-4 w-4 animate-spin" /> Saving…</>
               ) : saved ? (
-                <>
-                  <CheckCircle className="h-4 w-4" />
-                  Saved!
-                </>
+                <><CheckCircle className="h-4 w-4" /> Saved!</>
               ) : (
-                <>
-                  <Save className="h-4 w-4" />
-                  Save Settings
-                </>
+                <><Save className="h-4 w-4" /> Save Settings</>
               )}
             </Button>
           </div>
         </CardContent>
       </Card>
 
-      {/* Info Box */}
-      <Card className="bg-blue-50 border-blue-200">
-        <CardHeader>
-          <CardTitle className="text-base">How to Get Started</CardTitle>
+      {/* Quick guide */}
+      <Card className="border-blue-200 bg-blue-50">
+        <CardHeader className="pb-2">
+          <CardTitle className="text-sm font-semibold text-blue-800">Quick Setup Guide</CardTitle>
         </CardHeader>
-        <CardContent className="text-sm space-y-2">
-          <p>1. Choose your preferred LLM provider from the dropdown above</p>
-          <p>2. Get an API key from the provider's console</p>
-          <p>3. Enter your API key and select the model</p>
-          <p>4. Click "Save Settings"</p>
-          <p>5. Your agents will now use your configured LLM for responses</p>
+        <CardContent className="text-sm text-blue-700 space-y-1">
+          <p>1. Select your LLM provider above</p>
+          <p>2. Click the link to get your API key from the provider's console</p>
+          <p>3. Paste the key, confirm the model name, and click <strong>Save Settings</strong></p>
+          <p>4. Open any Agent chat page — responses will now come from your chosen LLM</p>
         </CardContent>
       </Card>
     </div>
