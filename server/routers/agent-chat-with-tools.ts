@@ -520,11 +520,11 @@ export const agentChatWithToolsRouter = router({
           // Try to infer chart type and data from the results
           const lastResult = toolResults[toolResults.length - 1];
           if (lastResult && typeof lastResult === 'object') {
-            const chartSpec = {
+            const chartSpec: any = {
               type: 'bar',
               title: 'Data Visualization',
-              labels: [],
-              values: []
+              labels: [] as string[],
+              values: [] as number[]
             };
             
             // Simple heuristic: if result has array data, use it for chart
