@@ -423,3 +423,19 @@ export const conversationLogs = mysqlTable("conversation_logs", {
 
 export type ConversationLog = typeof conversationLogs.$inferSelect;
 export type InsertConversationLog = typeof conversationLogs.$inferInsert;
+
+// ============ REVIEWER AGENT INTER-AGENT CONVERSATIONS ============
+export const reviewerConversations = mysqlTable("reviewer_conversations", {
+  conversationId: varchar("conversation_id", { length: 64 }).primaryKey(),
+  sessionId: varchar("session_id", { length: 64 }).notNull(),
+  supervisionId: varchar("supervision_id", { length: 64 }),
+  fromAgent: varchar("from_agent", { length: 128 }).notNull(),
+  toAgent: varchar("to_agent", { length: 128 }).notNull(),
+  messageType: varchar("message_type", { length: 32 }).notNull(), // review | guidance | retry_request | tool_request | escalation | resolution
+  message: text("message").notNull(),
+  context: json("context"),
+  score: int("score"),
+  createdAt: timestamp("createdAt").defaultNow(),
+});
+export type ReviewerConversation = typeof reviewerConversations.$inferSelect;
+export type InsertReviewerConversation = typeof reviewerConversations.$inferInsert;

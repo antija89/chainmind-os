@@ -5,7 +5,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
-import { Loader2, Send, RotateCcw, Bot, User, Wrench } from 'lucide-react';
+import { Loader2, Send, RotateCcw, Bot, User, Wrench, ShieldCheck, AlertTriangle, CheckCircle2 } from 'lucide-react';
 import { trpc } from '@/lib/trpc';
 import { toast } from 'sonner';
 import { Streamdown } from 'streamdown';
@@ -222,12 +222,39 @@ export default function AgentChat() {
 
   const [messages, setMessages] = useState<Message[]>([makeWelcome(agent)]);
   const [input, setInput] = useState('');
+  const [historyLoaded, setHistoryLoaded] = useState(false);
+  const [reviewerStatus, setReviewerStatus] = useState<{ wasRetried: boolean; score?: number } | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
+
+  // Load chat history from DB
+  const historyQuery = trpc.agentChatWithTools.getHistory.useQuery(
+    { agentId, limit: 50 },
+    { enabled: !historyLoaded }
+  );
+
+  useEffect(() => {
+    if (historyQuery.data && !historyLoaded) {
+      const dbMessages = historyQuery.data.messages;
+      if (dbMessages.length > 0) {
+        const mapped = dbMessages.map(m => ({
+          id: m.id,
+          role: m.role,
+          content: m.content,
+          timestamp: new Date(m.timestamp),
+        }));
+        setMessages([makeWelcome(agent), ...mapped]);
+      }
+      setHistoryLoaded(true);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [historyQuery.data]);
 
   // Reset on agent change
   useEffect(() => {
     setMessages([makeWelcome(agent)]);
     setInput('');
+    setHistoryLoaded(false);
+    setReviewerStatus(null);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [agentId]);
 
@@ -251,6 +278,12 @@ export default function AgentChat() {
       const content = typeof data.response === 'string' ? data.response : String(data.response ?? '');
       const toolResults = (data.toolResults ?? []) as ToolResult[];
       const chartSpecs = extractChartSpecs(toolResults);
+
+      // Show reviewer status
+      if ((data as any).wasRetried !== undefined) {
+        setReviewerStatus({ wasRetried: (data as any).wasRetried });
+        setTimeout(() => setReviewerStatus(null), 6000);
+      }
 
       setMessages(prev => [
         ...prev,
@@ -310,6 +343,7 @@ export default function AgentChat() {
 
   const handleClear = () => {
     setMessages([makeWelcome(agent)]);
+    setHistoryLoaded(false);
   };
 
   const showQuickPrompts = messages.length <= 1;
@@ -326,10 +360,35 @@ export default function AgentChat() {
           </div>
           <Badge className={agent.color}>{agent.badge}</Badge>
         </div>
-        <Button variant="outline" size="sm" onClick={handleClear} className="gap-2">
-          <RotateCcw className="h-3.5 w-3.5" /> Clear
-        </Button>
+        <div className="flex items-center gap-2">
+          {historyQuery.isLoading && (
+            <span className="text-xs text-muted-foreground flex items-center gap-1">
+              <Loader2 className="h-3 w-3 animate-spin" /> Loading history…
+            </span>
+          )}
+          <Button variant="outline" size="sm" onClick={handleClear} className="gap-2">
+            <RotateCcw className="h-3.5 w-3.5" /> Clear
+          </Button>
+        </div>
       </div>
+
+      {/* Reviewer status banner */}
+      {reviewerStatus && (
+        <div className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm mb-2 shrink-0 ${
+          reviewerStatus.wasRetried
+            ? 'bg-amber-50 border border-amber-200 text-amber-800'
+            : 'bg-green-50 border border-green-200 text-green-800'
+        }`}>
+          {reviewerStatus.wasRetried ? (
+            <><AlertTriangle className="h-4 w-4 shrink-0" />
+            <span><strong>Reviewer intervened:</strong> The initial response was inadequate. The Reviewer Agent provided guidance and the agent retried with improved instructions.</span></>
+          ) : (
+            <><CheckCircle2 className="h-4 w-4 shrink-0" />
+            <span><strong>Reviewer approved:</strong> Response quality passed review.</span></>
+          )}
+          <ShieldCheck className="h-4 w-4 ml-auto shrink-0 opacity-60" />
+        </div>
+      )}
 
       {/* Messages */}
       <ScrollArea className="flex-1 pr-2">

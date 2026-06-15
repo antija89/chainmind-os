@@ -2,7 +2,7 @@ import { protectedProcedure, router } from '../_core/trpc';
 import { invokeLLM } from '../_core/llm';
 import { z } from 'zod';
 import { getToolsByAgent, logToolExecution } from '../db-tools';
-import { saveAgentMessage, writeAuditLog } from '../db';
+import { saveAgentMessage, getAgentMessages, writeAuditLog } from '../db';
 import { logSupervisionEvent } from '../db-supervision';
 import { orchestrateWithReviewer } from '../reviewer-orchestrator';
 import { getDb } from '../db';
@@ -606,10 +606,18 @@ export const agentChatWithToolsRouter = router({
           assistantContent = 'I processed your request but could not generate a response. Please try rephrasing your question.';
         }
 
-        // Save agent message to DB
+        // Save user + agent messages to DB for history
         try {
           await saveAgentMessage({
             agentId: input.agentId,
+            userId: ctx.user?.id,
+            content: input.message,
+            role: 'user',
+            metadata: { messageId },
+          });
+          await saveAgentMessage({
+            agentId: input.agentId,
+            userId: ctx.user?.id,
             content: assistantContent,
             role: 'assistant',
             metadata: { toolResults, toolCount: toolResults.length, userMessage: input.message, messageId },
@@ -775,6 +783,28 @@ export const agentChatWithToolsRouter = router({
           success: false,
           error: error instanceof Error ? error.message : 'Unknown error',
         };
+      }
+    }),
+
+  getHistory: protectedProcedure
+    .input(z.object({
+      agentId: z.string(),
+      limit: z.number().optional().default(50),
+    }))
+    .query(async ({ input, ctx }) => {
+      try {
+        const msgs = await getAgentMessages(input.agentId, ctx.user?.id ?? 0, input.limit);
+        return {
+          messages: msgs.map(m => ({
+            id: m.messageId,
+            role: (m.role ?? 'assistant') as 'user' | 'assistant',
+            content: m.content ?? '',
+            timestamp: m.createdAt ?? new Date(),
+            metadata: m.metadata as any,
+          })),
+        };
+      } catch {
+        return { messages: [] };
       }
     }),
 

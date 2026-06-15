@@ -307,3 +307,19 @@
 - [x] Fix normalizeMessage in llm.ts to preserve tool_calls for multi-turn tool calling
 - [x] Skip non-deterministic debug chart test (LLM API returns no tool call ids)
 - [x] All 28 tests passing, 1 skipped (debug test)
+
+## Phase 27: Reviewer Agent DB Fix & Chat History (COMPLETED)
+- [x] Root cause: reviewer_conversations table missing from DB (all inserts/selects failed silently)
+- [x] Create reviewer_conversations table via webdev_execute_sql
+- [x] Add reviewerConversations to drizzle/schema.ts for type-safe ORM access
+- [x] Rewrite reviewer-orchestrator.ts to use Drizzle ORM (db.insert/db.select) instead of raw SQL with ? placeholders
+- [x] Fix getInterAgentConversations to use db.select().from(reviewerConversations).orderBy().limit()
+- [x] Fix getReviewerStats to use Drizzle ORM queries (no raw SQL)
+- [x] Add getHistory tRPC procedure to agentChatWithToolsRouter
+- [x] Import getAgentMessages in agent-chat-with-tools.ts
+- [x] Save both user and assistant messages with userId in saveAgentMessage calls
+- [x] Add history loading useEffect in AgentChat.tsx (loads from DB on mount per agent)
+- [x] Add reviewer status banner in AgentChat.tsx (amber=retried, green=approved, auto-dismisses after 6s)
+- [x] Add "Loading history..." indicator in chat header
+- [x] Set global vitest testTimeout to 15000ms to fix flaky DB tests
+- [x] All 28 tests passing (1 skipped)

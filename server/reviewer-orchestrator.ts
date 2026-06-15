@@ -18,6 +18,8 @@ import { invokeLLM } from './_core/llm';
 import { getDb } from './db';
 import { nanoid } from 'nanoid';
 import { createGuidance } from './db-supervision';
+import { reviewerConversations } from '../drizzle/schema';
+import { eq, or, desc } from 'drizzle-orm';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -43,6 +45,8 @@ export interface InterAgentMessage {
   messageType: 'review' | 'guidance' | 'retry_request' | 'tool_request' | 'escalation' | 'resolution';
   message: string;
   context?: Record<string, unknown>;
+  score?: number;
+  createdAt?: Date;
 }
 
 export interface ReviewerRetryResult {
@@ -58,26 +62,26 @@ export interface ReviewerRetryResult {
 
 // ─── DB helpers ──────────────────────────────────────────────────────────────
 
-async function saveInterAgentMessage(msg: Omit<InterAgentMessage, 'conversationId'>): Promise<string> {
+async function saveInterAgentMessage(
+  msg: Omit<InterAgentMessage, 'conversationId'>,
+  score?: number
+): Promise<string> {
   const db = await getDb();
   const conversationId = `rac-${nanoid(12)}`;
   if (!db) return conversationId;
   try {
-    await (db as any).execute(
-      `INSERT INTO reviewer_conversations 
-        (conversation_id, session_id, supervision_id, from_agent, to_agent, message_type, message, context)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-      [[
-        conversationId,
-        msg.sessionId,
-        msg.supervisionId || null,
-        msg.fromAgent,
-        msg.toAgent,
-        msg.messageType,
-        msg.message,
-        msg.context ? JSON.stringify(msg.context) : null,
-      ]]
-    );
+    await db.insert(reviewerConversations).values({
+      conversationId,
+      sessionId: msg.sessionId,
+      supervisionId: msg.supervisionId || null,
+      fromAgent: msg.fromAgent,
+      toAgent: msg.toAgent,
+      messageType: msg.messageType,
+      message: msg.message,
+      context: msg.context || null,
+      score: score ?? null,
+      createdAt: new Date(),
+    });
   } catch (err) {
     console.warn('[ReviewerOrchestrator] Failed to save inter-agent message:', err);
   }
@@ -121,9 +125,11 @@ export async function evaluateAgentResponse(params: {
     'i cannot create charts',
     'i cannot generate',
     'i am unable to',
-    'i don\'t have the ability',
+    "i don't have the ability",
     'i can only provide text',
     'i cannot access',
+    'i cannot provide',
+    'i cannot directly',
   ];
   const isRefusal = refusalPatterns.some(p => agentResponse.toLowerCase().includes(p));
 
@@ -184,7 +190,9 @@ Criteria:
     });
 
     const rawContent = evalResponse?.choices?.[0]?.message?.content;
-    const content = typeof rawContent === 'string' ? rawContent : (Array.isArray(rawContent) ? rawContent.map((c: any) => c.text || '').join('') : null);
+    const content = typeof rawContent === 'string'
+      ? rawContent
+      : (Array.isArray(rawContent) ? rawContent.map((c: any) => c.text || '').join('') : null);
     if (content) {
       const parsed = JSON.parse(content);
       return {
@@ -262,7 +270,7 @@ export async function orchestrateWithReviewer(params: {
     message: `Quality Score: ${evaluation.score}/100 (${evaluation.quality}). Issues: ${evaluation.issues.join('; ') || 'None'}`,
     context: { evaluation, userQuestion, responsePreview: agentResponse.substring(0, 200) },
   };
-  const reviewMsgId = await saveInterAgentMessage(reviewMsg);
+  const reviewMsgId = await saveInterAgentMessage(reviewMsg, evaluation.score);
   interAgentMessages.push({ ...reviewMsg, conversationId: reviewMsgId });
 
   // If response is good enough, no intervention needed
@@ -274,7 +282,7 @@ export async function orchestrateWithReviewer(params: {
       message: `Response approved. Quality: ${evaluation.quality} (${evaluation.score}/100). No intervention needed.`,
       context: { score: evaluation.score },
     };
-    const resMsgId = await saveInterAgentMessage(resolutionMsg);
+    const resMsgId = await saveInterAgentMessage(resolutionMsg, evaluation.score);
     interAgentMessages.push({ ...resolutionMsg, conversationId: resMsgId });
 
     return {
@@ -297,7 +305,7 @@ export async function orchestrateWithReviewer(params: {
     message: guidanceText,
     context: { evaluation, steps: evaluation.steps },
   };
-  const guidanceMsgId = await saveInterAgentMessage(guidanceMsg);
+  const guidanceMsgId = await saveInterAgentMessage(guidanceMsg, evaluation.score);
   interAgentMessages.push({ ...guidanceMsg, conversationId: guidanceMsgId });
 
   // Save to agent_guidance table
@@ -412,38 +420,37 @@ export async function getInterAgentConversations(params: {
 }): Promise<InterAgentMessage[]> {
   const db = await getDb();
   if (!db) return [];
-
   try {
-    let query = `SELECT * FROM reviewer_conversations`;
-    const conditions: string[] = [];
-    const values: unknown[] = [];
+    let query = db.select().from(reviewerConversations);
 
-    if (params.sessionId) {
-      conditions.push('session_id = ?');
-      values.push(params.sessionId);
-    }
     if (params.agentId) {
-      conditions.push('(from_agent = ? OR to_agent = ?)');
-      values.push(params.agentId, params.agentId);
+      (query as any).where(
+        or(
+          eq(reviewerConversations.fromAgent, params.agentId),
+          eq(reviewerConversations.toAgent, params.agentId)
+        )
+      );
+    } else if (params.sessionId) {
+      (query as any).where(eq(reviewerConversations.sessionId, params.sessionId));
     }
 
-    if (conditions.length > 0) {
-      query += ` WHERE ${conditions.join(' AND ')}`;
-    }
-    query += ` ORDER BY created_at DESC LIMIT ?`;
-    values.push(params.limit || 50);
+    const rows = await db
+      .select()
+      .from(reviewerConversations)
+      .orderBy(desc(reviewerConversations.createdAt))
+      .limit(params.limit || 50);
 
-    const [rows] = await (db as any).execute(query, values);
-    return (rows as any[]).map(row => ({
-      conversationId: row.conversation_id,
-      sessionId: row.session_id,
-      supervisionId: row.supervision_id,
-      fromAgent: row.from_agent,
-      toAgent: row.to_agent,
-      messageType: row.message_type,
+    return rows.map(row => ({
+      conversationId: row.conversationId,
+      sessionId: row.sessionId,
+      supervisionId: row.supervisionId ?? undefined,
+      fromAgent: row.fromAgent,
+      toAgent: row.toAgent,
+      messageType: row.messageType as InterAgentMessage['messageType'],
       message: row.message,
-      context: row.context ? (typeof row.context === 'string' ? JSON.parse(row.context) : row.context) : undefined,
-      createdAt: row.created_at,
+      context: row.context as Record<string, unknown> | undefined,
+      score: row.score ?? undefined,
+      createdAt: row.createdAt ?? undefined,
     }));
   } catch (err) {
     console.warn('[ReviewerOrchestrator] Failed to fetch inter-agent conversations:', err);
@@ -460,25 +467,18 @@ export async function getReviewerStats(): Promise<{
 }> {
   const db = await getDb();
   if (!db) return { totalReviews: 0, interventions: 0, toolRequests: 0, resolutions: 0, avgScore: 0 };
-
   try {
-    const [rows] = await (db as any).execute(`
-      SELECT 
-        COUNT(*) as total,
-        SUM(CASE WHEN message_type = 'guidance' THEN 1 ELSE 0 END) as interventions,
-        SUM(CASE WHEN message_type = 'tool_request' THEN 1 ELSE 0 END) as tool_requests,
-        SUM(CASE WHEN message_type = 'resolution' THEN 1 ELSE 0 END) as resolutions
-      FROM reviewer_conversations
-      WHERE from_agent = 'reviewer_agent'
-    `);
-    const row = (rows as any[])[0] || {};
-    return {
-      totalReviews: Number(row.total || 0),
-      interventions: Number(row.interventions || 0),
-      toolRequests: Number(row.tool_requests || 0),
-      resolutions: Number(row.resolutions || 0),
-      avgScore: 0, // computed separately from supervision_logs
-    };
+    const rows = await db.select().from(reviewerConversations);
+    const total = rows.length;
+    const interventions = rows.filter(r => r.messageType === 'guidance').length;
+    const toolRequests = rows.filter(r => r.messageType === 'tool_request').length;
+    const resolutions = rows.filter(r => r.messageType === 'resolution').length;
+    const reviewRows = rows.filter(r => r.messageType === 'review' && r.score !== null);
+    const avgScore = reviewRows.length > 0
+      ? Math.round(reviewRows.reduce((sum, r) => sum + (r.score || 0), 0) / reviewRows.length)
+      : 0;
+
+    return { totalReviews: total, interventions, toolRequests, resolutions, avgScore };
   } catch {
     return { totalReviews: 0, interventions: 0, toolRequests: 0, resolutions: 0, avgScore: 0 };
   }
