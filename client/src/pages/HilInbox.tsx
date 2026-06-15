@@ -10,15 +10,15 @@ import { toast } from 'sonner';
 import { formatDistanceToNow } from 'date-fns';
 
 type HilGate = {
-  id: number;
-  title: string;
-  description: string;
-  agentName: string;
-  gateType: string;
-  priority: string;
-  status: string;
+  gateId: string;
+  title: string | null;
+  description: string | null;
+  agentName: string | null;
+  gateType: string | null;
+  priority: string | null;
+  status: string | null;
   requestedData?: string | null;
-  createdAt: Date;
+  createdAt: Date | null;
 };
 
 const PRIORITY_STYLE: Record<string, string> = {
@@ -99,7 +99,7 @@ export default function HilInbox() {
 
   const handleConfirm = (reason: string) => {
     if (!dialog) return;
-    respondMutation.mutate({ id: dialog.gate.id, action: dialog.action, reason });
+    respondMutation.mutate({ gateId: dialog.gate.gateId, action: dialog.action, reason });
   };
 
   const pendingCount = gates?.length ?? 0;
@@ -134,7 +134,7 @@ export default function HilInbox() {
       ) : (
         <div className="space-y-3">
           {gates.map(gate => (
-            <Card key={gate.id} className={`border-l-4 border border-slate-200 shadow-sm ${PRIORITY_STYLE[gate.priority ?? 'normal'] || PRIORITY_STYLE.normal}`}>
+            <Card key={gate.gateId} className={`border-l-4 border border-slate-200 shadow-sm ${PRIORITY_STYLE[gate.priority ?? 'normal'] || PRIORITY_STYLE.normal}`}>
               <CardContent className="p-4">
                 <div className="flex items-start justify-between gap-4">
                   <div className="flex-1 min-w-0">
@@ -157,19 +157,19 @@ export default function HilInbox() {
                   </div>
                   <div className="flex flex-col gap-2 shrink-0">
                     <button
-                      onClick={() => setDialog({ gate: gate as HilGate, action: 'approve' })}
+                      onClick={() => setDialog({ gate: gate as unknown as HilGate, action: 'approve' })}
                       className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 text-white text-xs rounded-lg hover:bg-emerald-700 transition-colors"
                     >
                       <CheckCircle className="w-3.5 h-3.5" /> Approve
                     </button>
                     <button
-                      onClick={() => setDialog({ gate: gate as HilGate, action: 'reject' })}
+                      onClick={() => setDialog({ gate: gate as unknown as HilGate, action: 'reject' })}
                       className="flex items-center gap-1.5 px-3 py-1.5 bg-red-600 text-white text-xs rounded-lg hover:bg-red-700 transition-colors"
                     >
                       <XCircle className="w-3.5 h-3.5" /> Reject
                     </button>
                     <button
-                      onClick={() => setDialog({ gate: gate as HilGate, action: 'override' })}
+                      onClick={() => setDialog({ gate: gate as unknown as HilGate, action: 'override' })}
                       className="flex items-center gap-1.5 px-3 py-1.5 bg-amber-500 text-white text-xs rounded-lg hover:bg-amber-600 transition-colors"
                     >
                       <RefreshCw className="w-3.5 h-3.5" /> Override

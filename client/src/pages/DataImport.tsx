@@ -42,7 +42,11 @@ export default function DataImport() {
     reader.onload = async (event) => {
       try {
         const data = event.target?.result as ArrayBuffer;
-        const base64 = Buffer.from(data).toString('base64');
+        // Use browser-native Uint8Array → base64 (no Node Buffer needed)
+        const bytes = new Uint8Array(data);
+        let binary = '';
+        for (let i = 0; i < bytes.byteLength; i++) binary += String.fromCharCode(bytes[i]);
+        const base64 = btoa(binary);
         
         const response = await importMutation.mutateAsync({
           tableName: selectedTable,

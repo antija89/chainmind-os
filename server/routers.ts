@@ -424,23 +424,23 @@ export const appRouter = router({
     // respond mutation (used by HilInbox page) — maps action to resolution
     respond: protectedProcedure
       .input(z.object({
-        id: z.number(),
+        gateId: z.string(),
         action: z.enum(['approve', 'reject', 'override']),
         reason: z.string().min(1, 'Reason is required'),
       }))
       .mutation(async ({ input, ctx }) => {
         const resolutionMap = { approve: 'approved', reject: 'rejected', override: 'overridden' } as const;
         const resolution = resolutionMap[input.action];
-        await resolveHilGate(String(input.id), resolution, input.reason, ctx.user.openId);
+        await resolveHilGate(input.gateId, resolution, input.reason, ctx.user.openId);
         await writeAuditLog({
           actorId: ctx.user.openId,
           actorName: ctx.user.name || ctx.user.openId,
           actorType: 'human',
           action: `hil_${resolution}`,
           entityType: 'hil_gate',
-          entityId: String(input.id),
+          entityId: input.gateId,
           reason: input.reason,
-          description: `HIL gate #${input.id} ${resolution}`,
+          description: `HIL gate ${input.gateId} ${resolution}`,
         });
         return { success: true };
       }),

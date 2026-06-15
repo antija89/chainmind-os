@@ -278,8 +278,7 @@ export type PlanStore = typeof planStore.$inferSelect;
 export type InsertPlanStore = typeof planStore.$inferInsert;
 
 export const hilGates = mysqlTable("hil_gates", {
-  id: int("id").autoincrement().primaryKey(),
-  gateId: varchar("gate_id", { length: 64 }).notNull().unique(),
+  gateId: varchar("gate_id", { length: 64 }).notNull().primaryKey(),
   title: varchar("title", { length: 255 }),
   description: text("description"),
   agentName: varchar("agent_name", { length: 128 }),

@@ -1,236 +1,254 @@
-import { useState } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Eye, Download, GitBranch } from "lucide-react";
+import { useState } from 'react';
+import { trpc } from '@/lib/trpc';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Skeleton } from '@/components/ui/skeleton';
+import { Eye, GitBranch, Plus, CheckCircle, Clock, FileText, AlertCircle } from 'lucide-react';
+import { toast } from 'sonner';
+import { formatDistanceToNow } from 'date-fns';
+import { useAuth } from '@/_core/hooks/useAuth';
 
-interface Plan {
-  id: string;
-  name: string;
-  type: string;
-  agent: string;
-  version: number;
-  status: "draft" | "under_review" | "approved";
-  createdAt: string;
-  createdBy: string;
+type PlanRow = {
+  planId: string;
+  version: number | null;
+  type: string | null;
+  agentId: string | null;
+  status: string | null;
+  approvedBy: string | null;
+  approvedAt: Date | null;
+  createdAt: Date | null;
+  updatedAt: Date | null;
+  dataPayload: unknown;
+};
+
+const STATUS_STYLE: Record<string, string> = {
+  draft: 'bg-slate-100 text-slate-700',
+  under_review: 'bg-amber-100 text-amber-800',
+  approved: 'bg-emerald-100 text-emerald-800',
+  rejected: 'bg-red-100 text-red-700',
+};
+
+const STATUS_ICON: Record<string, React.ReactNode> = {
+  draft: <FileText className="w-3.5 h-3.5" />,
+  under_review: <Clock className="w-3.5 h-3.5" />,
+  approved: <CheckCircle className="w-3.5 h-3.5" />,
+  rejected: <AlertCircle className="w-3.5 h-3.5" />,
+};
+
+function PlanCard({ plan, onViewDiff, onUpdateStatus }: {
+  plan: PlanRow;
+  onViewDiff: (plan: PlanRow) => void;
+  onUpdateStatus: (planId: string, status: string) => void;
+}) {
+  const status = plan.status ?? 'draft';
+  return (
+    <Card className="border border-slate-200 shadow-sm hover:shadow-md transition-shadow">
+      <CardContent className="p-5">
+        <div className="flex items-start justify-between gap-4">
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="font-semibold text-slate-900">{plan.type ?? 'Plan'} Plan</span>
+              <Badge className={`flex items-center gap-1 text-xs ${STATUS_STYLE[status] ?? STATUS_STYLE.draft}`}>
+                {STATUS_ICON[status]} {status.replace('_', ' ').toUpperCase()}
+              </Badge>
+              <Badge variant="outline" className="text-xs">v{plan.version ?? 1}</Badge>
+            </div>
+            <div className="mt-2 grid grid-cols-3 gap-3 text-xs text-slate-500">
+              <div><span className="font-medium text-slate-400 uppercase tracking-wide">Plan ID</span><p className="text-slate-700 font-mono mt-0.5">{plan.planId}</p></div>
+              <div><span className="font-medium text-slate-400 uppercase tracking-wide">Agent</span><p className="text-slate-700 mt-0.5">{plan.agentId ?? '—'}</p></div>
+              <div><span className="font-medium text-slate-400 uppercase tracking-wide">Created</span><p className="text-slate-700 mt-0.5">{plan.createdAt ? formatDistanceToNow(new Date(plan.createdAt), { addSuffix: true }) : '—'}</p></div>
+            </div>
+          </div>
+          <div className="flex flex-col gap-1.5 shrink-0">
+            <Button size="sm" variant="outline" className="text-xs" onClick={() => onViewDiff(plan)}>
+              <GitBranch className="w-3.5 h-3.5 mr-1" /> Diff
+            </Button>
+            <Button size="sm" variant="outline" className="text-xs">
+              <Eye className="w-3.5 h-3.5 mr-1" /> View
+            </Button>
+            {status === 'draft' && (
+              <Button size="sm" className="text-xs bg-amber-500 hover:bg-amber-600 text-white" onClick={() => onUpdateStatus(plan.planId, 'under_review')}>
+                Submit
+              </Button>
+            )}
+            {status === 'under_review' && (
+              <Button size="sm" className="text-xs bg-emerald-600 hover:bg-emerald-700 text-white" onClick={() => onUpdateStatus(plan.planId, 'approved')}>
+                Approve
+              </Button>
+            )}
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+function DiffPanel({ plan, onClose }: { plan: PlanRow; onClose: () => void }) {
+  const payload = plan.dataPayload as Record<string, unknown> | null;
+  const changes = payload?.changes as Array<{ field: string; from: unknown; to: unknown }> | undefined;
+  const summary = payload?.summary as string | undefined;
+
+  return (
+    <Dialog open onOpenChange={onClose}>
+      <DialogContent className="max-w-2xl">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <GitBranch className="w-5 h-5 text-slate-600" />
+            Version Diff — {plan.type} Plan v{plan.version}
+          </DialogTitle>
+        </DialogHeader>
+        <div className="space-y-4 max-h-96 overflow-y-auto">
+          {summary && (
+            <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg text-sm text-blue-800">
+              {summary}
+            </div>
+          )}
+          {changes && changes.length > 0 ? (
+            <div className="space-y-2">
+              {changes.map((c, i) => (
+                <div key={i} className="p-3 bg-slate-50 border border-slate-200 rounded-lg text-sm">
+                  <span className="font-medium text-slate-700">{c.field}:</span>
+                  <span className="ml-2 text-red-600 line-through">{String(c.from)}</span>
+                  <span className="mx-2 text-slate-400">→</span>
+                  <span className="text-emerald-700">{String(c.to)}</span>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="text-center py-8 text-slate-400">
+              <GitBranch className="w-8 h-8 mx-auto mb-2 opacity-40" />
+              <p className="text-sm">No structured diff available for this plan version.</p>
+              <p className="text-xs mt-1">Diff data is populated when agents update plans via the chat interface.</p>
+            </div>
+          )}
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={onClose}>Close</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function CreatePlanDialog({ open, onClose, onCreated }: { open: boolean; onClose: () => void; onCreated: () => void }) {
+  const [type, setType] = useState('Demand');
+  const { user } = useAuth();
+  const createMutation = trpc.plans.create.useMutation({
+    onSuccess: () => { toast.success('Plan created'); onCreated(); onClose(); },
+    onError: (e) => toast.error(`Failed: ${e.message}`),
+  });
+
+  return (
+    <Dialog open={open} onOpenChange={onClose}>
+      <DialogContent className="max-w-sm">
+        <DialogHeader><DialogTitle>Create New Plan</DialogTitle></DialogHeader>
+        <div className="space-y-4 py-2">
+          <div>
+            <label className="text-sm font-medium text-slate-700 mb-1.5 block">Plan Type</label>
+            <Select value={type} onValueChange={setType}>
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>
+                {['Demand', 'Supply', 'Production', 'Procurement'].map(t => (
+                  <SelectItem key={t} value={t}>{t}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={onClose}>Cancel</Button>
+          <Button
+            onClick={() => createMutation.mutate({ type, agentId: user?.openId ?? 'manual', dataPayload: { changes: [], summary: 'Manually created plan' }, version: 1 })}
+            disabled={createMutation.isPending}
+          >
+            {createMutation.isPending ? 'Creating...' : 'Create Plan'}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
 }
 
 export default function PlanStore() {
-  const [plans, setPlans] = useState<Plan[]>([
-    {
-      id: "plan-001",
-      name: "Demand Plan W24-26",
-      type: "Demand",
-      agent: "Demand Planner",
-      version: 5,
-      status: "approved",
-      createdAt: "2024-06-14",
-      createdBy: "Ahmed",
-    },
-    {
-      id: "plan-002",
-      name: "Supply Plan Q3 2024",
-      type: "Supply",
-      agent: "Supply Planner",
-      version: 3,
-      status: "under_review",
-      createdAt: "2024-06-13",
-      createdBy: "Fatima",
-    },
-    {
-      id: "plan-003",
-      name: "Production Schedule W24",
-      type: "Production",
-      agent: "Production Planner",
-      version: 2,
-      status: "draft",
-      createdAt: "2024-06-12",
-      createdBy: "Mohammed",
-    },
-  ]);
+  const [diffPlan, setDiffPlan] = useState<PlanRow | null>(null);
+  const [showCreate, setShowCreate] = useState(false);
+  const utils = trpc.useUtils();
 
-  const [selectedPlan, setSelectedPlan] = useState<Plan | null>(null);
-  const [showDiff, setShowDiff] = useState(false);
+  const { data: plans, isLoading } = trpc.plans.list.useQuery({});
 
-  const statusColor = {
-    draft: "bg-gray-100 text-gray-800",
-    under_review: "bg-amber-100 text-amber-800",
-    approved: "bg-green-100 text-green-800",
+  const updateStatusMutation = trpc.plans.updateStatus.useMutation({
+    onSuccess: () => { toast.success('Plan status updated'); utils.plans.list.invalidate(); },
+    onError: (e) => toast.error(`Failed: ${e.message}`),
+  });
+
+  const handleUpdateStatus = (planId: string, status: string) => {
+    updateStatusMutation.mutate({ planId, status: status as 'draft' | 'under_review' | 'approved' | 'rejected' });
   };
 
-  const dummyDiff = {
-    added: [
-      { field: "SKU-001", change: "Forecast increased from 5000 to 5500 units" },
-      { field: "SKU-002", change: "Lead time adjusted from 14 to 16 days" },
-    ],
-    modified: [
-      { field: "Service Level", change: "Target updated from 94% to 95%" },
-    ],
-    removed: [
-      { field: "SKU-003", change: "Removed from active planning" },
-    ],
-  };
+  const filterByStatus = (status: string) => (plans ?? []).filter(p => p.status === status) as PlanRow[];
+  const allPlans = (plans ?? []) as PlanRow[];
+
+  const tabContent = (filtered: PlanRow[]) => (
+    isLoading ? (
+      <div className="space-y-3">{Array.from({ length: 3 }).map((_, i) => <Skeleton key={i} className="h-28 w-full" />)}</div>
+    ) : filtered.length === 0 ? (
+      <Card className="border border-slate-200"><CardContent className="py-12 text-center text-slate-400">
+        <FileText className="w-8 h-8 mx-auto mb-2 opacity-30" />
+        <p className="text-sm">No plans in this category</p>
+      </CardContent></Card>
+    ) : (
+      <div className="space-y-3">
+        {filtered.map(plan => (
+          <PlanCard key={plan.planId} plan={plan} onViewDiff={setDiffPlan} onUpdateStatus={handleUpdateStatus} />
+        ))}
+      </div>
+    )
+  );
 
   return (
-    <div className="space-y-6">
+    <div className="p-6 space-y-5 bg-slate-50 min-h-full">
       <div className="flex items-center justify-between">
-        <h1 className="text-3xl font-bold text-gray-900">Plan Store</h1>
-        <Button variant="default">Create New Plan</Button>
+        <div>
+          <h1 className="text-2xl font-bold text-slate-900 flex items-center gap-2">
+            <FileText className="w-6 h-6 text-slate-700" /> Plan Store
+          </h1>
+          <p className="text-sm text-slate-500 mt-0.5">Versioned demand and supply plans with approval workflow</p>
+        </div>
+        <Button onClick={() => setShowCreate(true)} className="flex items-center gap-1.5">
+          <Plus className="w-4 h-4" /> New Plan
+        </Button>
       </div>
 
-      <Tabs defaultValue="all" className="w-full">
-        <TabsList>
+      <div className="flex gap-3 text-sm">
+        {['all', 'draft', 'under_review', 'approved'].map(s => {
+          const count = s === 'all' ? allPlans.length : filterByStatus(s).length;
+          return (
+            <div key={s} className={`px-3 py-1.5 rounded-full border text-xs font-medium ${STATUS_STYLE[s] ?? 'bg-slate-100 text-slate-600'}`}>
+              {s === 'all' ? 'All' : s.replace('_', ' ')} ({count})
+            </div>
+          );
+        })}
+      </div>
+
+      <Tabs defaultValue="all">
+        <TabsList className="bg-white border border-slate-200">
           <TabsTrigger value="all">All Plans</TabsTrigger>
           <TabsTrigger value="approved">Approved</TabsTrigger>
-          <TabsTrigger value="under-review">Under Review</TabsTrigger>
+          <TabsTrigger value="under_review">Under Review</TabsTrigger>
           <TabsTrigger value="draft">Draft</TabsTrigger>
         </TabsList>
-
-        <TabsContent value="all" className="space-y-4">
-          {plans.map((plan) => (
-            <Card key={plan.id} className="hover:shadow-md transition-shadow">
-              <CardContent className="pt-6">
-                <div className="flex items-start justify-between">
-                  <div className="flex-1">
-                    <div className="flex items-center gap-3">
-                      <h3 className="text-lg font-semibold text-gray-900">{plan.name}</h3>
-                      <Badge className={statusColor[plan.status]}>
-                        {plan.status.replace("_", " ").toUpperCase()}
-                      </Badge>
-                      <Badge variant="outline">v{plan.version}</Badge>
-                    </div>
-                    <div className="mt-2 grid grid-cols-4 gap-4 text-sm text-gray-600">
-                      <div>
-                        <p className="text-xs font-medium text-gray-500">TYPE</p>
-                        <p>{plan.type}</p>
-                      </div>
-                      <div>
-                        <p className="text-xs font-medium text-gray-500">AGENT</p>
-                        <p>{plan.agent}</p>
-                      </div>
-                      <div>
-                        <p className="text-xs font-medium text-gray-500">CREATED</p>
-                        <p>{plan.createdAt}</p>
-                      </div>
-                      <div>
-                        <p className="text-xs font-medium text-gray-500">BY</p>
-                        <p>{plan.createdBy}</p>
-                      </div>
-                    </div>
-                  </div>
-                  <div className="flex gap-2 ml-4">
-                    <Button size="sm" variant="outline" onClick={() => (setSelectedPlan(plan), setShowDiff(true))}>
-                      <GitBranch className="w-4 h-4 mr-1" />
-                      Diff
-                    </Button>
-                    <Button size="sm" variant="outline">
-                      <Eye className="w-4 h-4 mr-1" />
-                      View
-                    </Button>
-                    <Button size="sm" variant="outline">
-                      <Download className="w-4 h-4 mr-1" />
-                      Export
-                    </Button>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          ))}
-        </TabsContent>
-
-        <TabsContent value="approved">
-          {plans
-            .filter((p) => p.status === "approved")
-            .map((plan) => (
-              <Card key={plan.id} className="mb-4">
-                <CardContent className="pt-6">
-                  <h3 className="font-semibold">{plan.name}</h3>
-                  <p className="text-sm text-gray-600 mt-1">{plan.agent}</p>
-                </CardContent>
-              </Card>
-            ))}
-        </TabsContent>
-
-        <TabsContent value="under-review">
-          {plans
-            .filter((p) => p.status === "under_review")
-            .map((plan) => (
-              <Card key={plan.id} className="mb-4">
-                <CardContent className="pt-6">
-                  <h3 className="font-semibold">{plan.name}</h3>
-                  <p className="text-sm text-gray-600 mt-1">{plan.agent}</p>
-                </CardContent>
-              </Card>
-            ))}
-        </TabsContent>
-
-        <TabsContent value="draft">
-          {plans
-            .filter((p) => p.status === "draft")
-            .map((plan) => (
-              <Card key={plan.id} className="mb-4">
-                <CardContent className="pt-6">
-                  <h3 className="font-semibold">{plan.name}</h3>
-                  <p className="text-sm text-gray-600 mt-1">{plan.agent}</p>
-                </CardContent>
-              </Card>
-            ))}
-        </TabsContent>
+        <TabsContent value="all" className="mt-4">{tabContent(allPlans)}</TabsContent>
+        <TabsContent value="approved" className="mt-4">{tabContent(filterByStatus('approved'))}</TabsContent>
+        <TabsContent value="under_review" className="mt-4">{tabContent(filterByStatus('under_review'))}</TabsContent>
+        <TabsContent value="draft" className="mt-4">{tabContent(filterByStatus('draft'))}</TabsContent>
       </Tabs>
 
-      {showDiff && selectedPlan && (
-        <Card>
-          <CardHeader>
-            <div className="flex items-center justify-between">
-              <CardTitle>Version Diff: {selectedPlan.name}</CardTitle>
-              <Button variant="ghost" onClick={() => setShowDiff(false)}>
-                Close
-              </Button>
-            </div>
-          </CardHeader>
-          <CardContent className="space-y-6">
-            {dummyDiff.added.length > 0 && (
-              <div>
-                <h4 className="font-semibold text-green-700 mb-2">Added</h4>
-                <div className="space-y-2">
-                  {dummyDiff.added.map((item, idx) => (
-                    <div key={idx} className="p-2 bg-green-50 border border-green-200 rounded text-sm">
-                      <span className="font-mono text-green-900">{item.field}:</span> {item.change}
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {dummyDiff.modified.length > 0 && (
-              <div>
-                <h4 className="font-semibold text-amber-700 mb-2">Modified</h4>
-                <div className="space-y-2">
-                  {dummyDiff.modified.map((item, idx) => (
-                    <div key={idx} className="p-2 bg-amber-50 border border-amber-200 rounded text-sm">
-                      <span className="font-mono text-amber-900">{item.field}:</span> {item.change}
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {dummyDiff.removed.length > 0 && (
-              <div>
-                <h4 className="font-semibold text-red-700 mb-2">Removed</h4>
-                <div className="space-y-2">
-                  {dummyDiff.removed.map((item, idx) => (
-                    <div key={idx} className="p-2 bg-red-50 border border-red-200 rounded text-sm">
-                      <span className="font-mono text-red-900">{item.field}:</span> {item.change}
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      )}
+      {diffPlan && <DiffPanel plan={diffPlan} onClose={() => setDiffPlan(null)} />}
+      {showCreate && <CreatePlanDialog open={showCreate} onClose={() => setShowCreate(false)} onCreated={() => utils.plans.list.invalidate()} />}
     </div>
   );
 }
