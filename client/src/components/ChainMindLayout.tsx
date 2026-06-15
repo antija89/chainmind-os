@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { trpc } from "@/lib/trpc";
 import {
   LogOut, Menu, X, LayoutDashboard, Inbox, Table2,
-  Upload, BookOpen, ScrollText, Settings, Users, ChevronDown, ChevronRight
+  Upload, BookOpen, ScrollText, Settings, Users, ChevronDown, ChevronRight, Wrench
 } from "lucide-react";
 
 interface ChainMindLayoutProps {
@@ -40,6 +40,7 @@ export default function ChainMindLayout({ children }: ChainMindLayoutProps) {
     { path: "/plan-store", label: "Plan Store", icon: <BookOpen className="w-4 h-4" /> },
     { path: "/audit-trail", label: "Audit Trail", icon: <ScrollText className="w-4 h-4" /> },
     { path: "/agents", label: "Agent Roster", icon: <Users className="w-4 h-4" /> },
+    { path: "/tools", label: "Tool Management", icon: <Wrench className="w-4 h-4" /> },
     { path: "/settings", label: "Settings", icon: <Settings className="w-4 h-4" /> },
   ];
 

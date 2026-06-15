@@ -24,6 +24,26 @@ import {
   logToolExecution, getToolExecutionHistory, getToolStats,
 } from './db-tools';
 
+// ============ TOOL MAPPER (Drizzle camelCase → snake_case for frontend) ============
+function mapTool(t: any) {
+  return {
+    tool_id: t.toolId ?? t.tool_id,
+    name: t.name,
+    description: t.description,
+    category: t.category,
+    agent_ids: t.agentIds ?? t.agent_ids ?? [],
+    input_schema: t.inputSchema ?? t.input_schema ?? {},
+    output_schema: t.outputSchema ?? t.output_schema ?? {},
+    implementation: t.implementation,
+    data_sources: t.dataSources ?? t.data_sources ?? [],
+    complexity: t.complexity ?? 'simple',
+    is_active: t.isActive ?? t.is_active ?? true,
+    created_by: t.createdBy ?? t.created_by,
+    created_at: t.createdAt ?? t.created_at,
+    updated_at: t.updatedAt ?? t.updated_at,
+  };
+}
+
 // ============ ROLE-BASED MIDDLEWARE ============
 
 export const adminProcedure = protectedProcedure.use(({ ctx, next }) => {
@@ -546,15 +566,24 @@ export const appRouter = router({
   tools: router({
     list: publicProcedure
       .input(z.object({ search: z.string().optional() }))
-      .query(({ input }) => getToolList(input.search)),
+      .query(async ({ input }) => {
+        const tools = await getToolList(input.search);
+        return (tools as any[]).map(mapTool);
+      }),
 
     getById: publicProcedure
       .input(z.object({ toolId: z.string() }))
-      .query(({ input }) => getToolById(input.toolId)),
+      .query(async ({ input }) => {
+        const tool = await getToolById(input.toolId);
+        return tool ? mapTool(tool as any) : null;
+      }),
 
     getByAgent: publicProcedure
       .input(z.object({ agentId: z.string() }))
-      .query(({ input }) => getToolsByAgent(input.agentId)),
+      .query(async ({ input }) => {
+        const tools = await getToolsByAgent(input.agentId);
+        return (tools as any[]).map(mapTool);
+      }),
 
     create: protectedProcedure
       .input(z.object({
