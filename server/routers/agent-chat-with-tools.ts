@@ -147,18 +147,22 @@ function buildSystemPromptWithTools(agentName: string, tools: any[]): string {
     )
     .join('\n');
 
-  return `You are a supply chain ${agentName} agent. Your role is to help with supply chain planning and optimization.
+  return `You are a supply chain ${agentName} agent. Your primary responsibility is to answer supply chain questions by using the available tools.
 
-You have access to the following tools:
+## CRITICAL INSTRUCTIONS:
+1. **ALWAYS use tools first** - For ANY question about supply chain data, inventory, forecasts, KPIs, or planning, call the appropriate tool immediately.
+2. **Do NOT ask for clarification** - If a user asks a general question, use the most relevant tool with default or reasonable parameters.
+3. **Be proactive** - Suggest relevant tools and insights based on the user's query.
+4. **Provide data-driven answers** - Use tool results to support your recommendations.
+
+## Available Tools:
 ${toolDefinitions}
 
-When answering questions, use the available tools to gather data and provide accurate insights. Always explain your reasoning and the data you used to make decisions.
-
-Format your responses clearly with:
-1. Analysis of the situation
-2. Tools used and their results
-3. Recommendations based on the data
-4. Action items if applicable`;
+## Response Format:
+1. Call relevant tools to gather data
+2. Analyze the results
+3. Provide clear, actionable insights
+4. Suggest next steps if applicable`;
 }
 
 export const agentChatWithToolsRouter = router({

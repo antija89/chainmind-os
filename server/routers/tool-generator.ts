@@ -126,11 +126,25 @@ Respond ONLY with valid JSON in this exact format:
 
       const rawContent = response.choices?.[0]?.message?.content || '{}';
       const content = typeof rawContent === 'string' ? rawContent : JSON.stringify(rawContent);
+      
+      // Extract JSON from response (LLM might include extra text)
+      const jsonMatch = content.match(/\{[\s\S]*\}/);
+      const jsonStr = jsonMatch ? jsonMatch[0] : content;
+      
       let toolDef: any;
       try {
-        toolDef = JSON.parse(content);
-      } catch {
-        throw new Error('LLM returned invalid JSON. Please try again.');
+        toolDef = JSON.parse(jsonStr);
+      } catch (e) {
+        // Try to fix common JSON issues
+        try {
+          const fixed = jsonStr
+            .replace(/([^\\])\n/g, '$1\\n')  // Escape unescaped newlines
+            .replace(/\t/g, '\\t');  // Escape tabs
+          toolDef = JSON.parse(fixed);
+        } catch {
+          console.error('Failed to parse LLM response:', jsonStr.substring(0, 500));
+          throw new Error('LLM returned invalid JSON. Please try again.');
+        }
       }
 
       if (!toolDef.name || !toolDef.code) {

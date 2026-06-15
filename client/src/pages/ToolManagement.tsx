@@ -443,7 +443,7 @@ export function ToolManagement() {
                       <SelectValue placeholder="Let AI decide" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="">Let AI decide</SelectItem>
+                      <SelectItem value="auto">Let AI decide</SelectItem>
                       {CATEGORIES.map((c) => <SelectItem key={c} value={c}>{c.charAt(0).toUpperCase() + c.slice(1)}</SelectItem>)}
                     </SelectContent>
                   </Select>
