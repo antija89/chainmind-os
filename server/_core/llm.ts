@@ -425,7 +425,13 @@ export async function invokeLLM(params: InvokeParams): Promise<InvokeResult> {
     );
   }
 
-  return (await response.json()) as InvokeResult;
+  const result = (await response.json()) as InvokeResult;
+  if (process.env.DEBUG_LLM) {
+    console.log('[LLM] Raw result keys:', Object.keys(result));
+    console.log('[LLM] Result model:', result.model);
+    console.log('[LLM] Result choices length:', result.choices?.length);
+  }
+  return result;
 }
 
 export type ModelInfo = {

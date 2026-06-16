@@ -49,7 +49,8 @@ export async function getToolsByAgent(agentId: string) {
   if (!db) return [];
   try {
     // JSON_CONTAINS to find agent in agent_ids array
-    return await db
+    console.log(`[Tools] Querying tools for agent: ${agentId}`);
+    const results = await db
       .select()
       .from(agentTools)
       .where(
@@ -58,9 +59,13 @@ export async function getToolsByAgent(agentId: string) {
           eq(agentTools.isActive, true)
         )
       );
-  } catch (error) {
+    console.log(`[Tools] Found ${results.length} tools for agent ${agentId}`);
+    return results;
+  } catch (error: any) {
     // Fallback: return all active tools
-    console.error('[Tools] getToolsByAgent error, returning all active tools:', error);
+    console.error('[Tools] getToolsByAgent error for agentId:', agentId);
+    console.error('[Tools] Error details:', error?.message || error);
+    console.error('[Tools] Falling back to all active tools');
     try {
       const db2 = await getDb();
       if (!db2) return [];

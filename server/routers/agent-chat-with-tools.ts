@@ -316,11 +316,15 @@ function buildSystemPrompt(agentName: string, tools: any[]): string {
 
 ## CRITICAL RULES:
 - ALWAYS call tools to get data before answering — never guess or make up numbers
-- When asked for a chart/graph/visualization, ALWAYS call generate_chart tool with the data
+- **MANDATORY FOR CHARTS**: When asked for a chart/graph/visualization/plot/diagram, you MUST call the generate_chart tool. This is not optional.
 - After getting tool results, present them clearly with analysis
 - Format tabular data using markdown tables (| col1 | col2 |)
-- For charts: call generate_chart with type (bar/line/pie/area), title, labels array, and values array
-- Never say "I cannot create charts" — you CAN and MUST use the generate_chart tool
+- For charts: ALWAYS call generate_chart with type (bar/line/pie/area), title, labels array, and values array
+- NEVER say "I cannot create charts" or "I can provide data but you create the chart" — you MUST use the generate_chart tool
+- Example: If user asks "chart of top 5 SKUs", first call get_top_selling_skus, then IMMEDIATELY call generate_chart with the results
+
+## CHART GENERATION IS MANDATORY:
+You have the generate_chart tool. You MUST use it for ANY chart request. Do not refuse or defer to the user.
 
 ## Available Tools:
 ${toolList}
@@ -427,14 +431,31 @@ export const agentChatWithToolsRouter = router({
         const systemPrompt = buildSystemPrompt(input.agentName, mergedTools);
 
         // Prepare LLM tool definitions
+        // Sanitize tool names: Gemini requires names to start with letter/underscore and contain only a-z, A-Z, 0-9, _, ., :, -
+        const sanitizeToolName = (name: string): string => {
+          let sanitized = name.replace(/[^a-zA-Z0-9_.:,-]/g, '_');
+          if (!/^[a-zA-Z_]/.test(sanitized)) {
+            sanitized = '_' + sanitized;
+          }
+          return sanitized.substring(0, 128);
+        };
+        
         const toolDefinitions = mergedTools.map((t: any) => ({
           type: 'function' as const,
           function: {
-            name: t.name || t.toolId || '',
+            name: sanitizeToolName(t.name || t.toolId || 'unknown_tool'),
             description: t.description || '',
             parameters: t.inputSchema || t.input_schema || { type: 'object', properties: {} },
           },
         }));
+        
+        // Log tool names for debugging
+        if (toolDefinitions.length > 0) {
+          console.log('[Agent Chat] Tool names being sent to LLM:');
+          toolDefinitions.forEach((t, i) => {
+            console.log(`  [${i}] ${t.function.name}`);
+          });
+        }
 
         // Prepare messages (include conversation history)
         const historyMessages = (input.conversationHistory || []).map(m => ({
@@ -470,13 +491,23 @@ export const agentChatWithToolsRouter = router({
           throw llmErr;
         }
         const primaryDuration = Date.now() - primaryStart;
+        
+        // Debug: log the raw response object
+        console.log('[Agent Chat] Raw response object keys:', Object.keys(response || {}));
+        console.log('[Agent Chat] Raw response:', JSON.stringify(response).substring(0, 500));
 
         const choice = response?.choices?.[0];
         const llmMessage = choice?.message;
         let assistantContent = typeof llmMessage?.content === 'string' ? llmMessage.content : '';
         const toolCalls = llmMessage?.tool_calls || [];
 
+        // Log the raw response for debugging
+        console.log(`[Agent Chat] LLM raw response — model: ${response?.model}, choices: ${response?.choices?.length}, finish: ${choice?.finish_reason}`);
+        console.log(`[Agent Chat] LLM message keys: ${Object.keys(llmMessage || {}).join(', ')}`);
         console.log(`[Agent Chat] LLM response — content: ${assistantContent.length} chars, tool calls: ${toolCalls.length}`);
+        if (toolCalls.length === 0 && assistantContent.length === 0) {
+          console.log('[Agent Chat] EMPTY RESPONSE - raw message:', JSON.stringify(llmMessage));
+        }
 
         // Log primary LLM call
         saveLlmCallLog({
@@ -563,15 +594,24 @@ export const agentChatWithToolsRouter = router({
             
             // Simple heuristic: if result has array data, use it for chart
             if (Array.isArray(lastResult)) {
-              chartSpec.labels = lastResult.slice(0, 5).map((item: any) => 
-                typeof item === 'object' ? (item.name || item.sku || item.id || 'Item') : String(item)
-              );
-              chartSpec.values = lastResult.slice(0, 5).map((item: any) => 
-                typeof item === 'object' ? (item.value || item.units || item.revenue || 0) : Number(item)
-              );
+              chartSpec.labels = lastResult.slice(0, 5).map((item: any) => {
+                if (typeof item === 'object') {
+                  return item.fg_description || item.name || item.sku || item.fg_code || item.id || 'Item';
+                }
+                return String(item);
+              });
+              chartSpec.values = lastResult.slice(0, 5).map((item: any) => {
+                if (typeof item === 'object') {
+                  const val = item.total_units || item.total_revenue || item.units || item.value || item.revenue || item.count || 0;
+                  return Number(val);
+                }
+                return Number(item);
+              });
               
               if (chartSpec.labels.length > 0 && chartSpec.values.length > 0) {
+                console.log('[Chart Auto-Generation] Extracted data:', { labels: chartSpec.labels, values: chartSpec.values });
                 const chartResult = await executeTool('generate_chart', chartSpec);
+                console.log('[Chart Auto-Generation] Chart result:', chartResult);
                 toolResults.push(chartResult);
               }
             }
