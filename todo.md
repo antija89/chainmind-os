@@ -337,3 +337,60 @@
 - [x] Built LLM API Logs page (/llm-logs) showing full input/output, model, API URL, tokens, duration
 - [x] Added LLM API Logs to sidebar navigation
 - [x] All 28 tests passing (1 skipped)
+
+
+## Phase A: Safety Limits + Execution State Machine (Priorities 10 & 9)
+- [x] Create safety-limits.ts with MAX_TOOL_ITERATIONS, MAX_REVIEW_ITERATIONS, MAX_REPLANS, MAX_TOOL_CREATIONS constants
+- [x] Create execution-state-machine.ts with ExecutionState enum and state transition logic
+- [x] Add execution_state column to agent_messages table (tracks current state per conversation)
+- [ ] Wire state machine into agent-chat-with-tools.ts execution flow
+- [ ] Add guard clauses for all safety limits in executor loop
+- [ ] Add state badges to Reviewer Dashboard
+
+## Phase B: Planner Agent + Plan Reviewer (Priorities 1 & 8)
+- [x] Create planner-agent.ts with Planner LLM system prompt (converts intent to structured plan)
+- [x] Create execution_plans table schema with plan structure (goal, required_info, steps, dependencies, success_criteria)
+- [x] Create plan-reviewer.ts with Plan Reviewer system prompt (validates plan before execution)
+- [ ] Wire Planner into agent-chat-with-tools.ts as pre-step before Executor
+- [ ] Wire Plan Reviewer as validation step after Planner
+- [ ] Store generated plans in DB with planId linkage
+- [ ] Display plan in Reviewer Dashboard with review status
+
+## Phase C: Multi-Step Executor (Priority 2)
+- [x] Create plan-executor.ts with execution loop (for each step: execute → store → update context → next)
+- [x] Implement step-by-step tool execution with result storage
+- [x] Add context accumulation across steps
+- [x] Implement success criteria checking
+- [x] Add iteration limit enforcement
+- [ ] Wire Executor into agent-chat-with-tools.ts after Plan Reviewer approval
+
+## Phase D: Execution Memory + Evidence-Based Reviewer (Priorities 3 & 4)
+- [x] Create plan_executions table schema (planId, step, tool, input, output, success, timestamp)
+- [x] Wire execution memory logging into plan-executor.ts
+- [x] Create evidence-reviewer.ts to evaluate tool outputs vs claims (not just text quality)
+- [x] Add evidence verification checks to Reviewer system prompt
+- [x] Evidence Reviewer checks plan completion, no unsupported assumptions, no ignored failures
+- [ ] Display execution trace in Reviewer Dashboard
+
+## Phase E: Replanning + Capability Registry (Priorities 5 & 6)
+- [x] Add capabilities JSON column to agent_tools table
+- [x] Create capability-registry.ts with getToolByCapability and registry lookup helpers
+- [x] Implement replan trigger in plan-executor.ts (on tool failure or missing info)
+- [x] Planner replan function with failure context
+- [x] Capability registry lookup before tool creation
+- [x] Enforce MAX_REPLANS limit in planner-agent.ts
+
+## Phase F: Safe Tool Creation (Priority 7)
+- [x] Create safe-tool-creation.ts with tool_specification validation
+- [x] Create security policy validator (scan for eval, exec, child_process, fs.writeFile, etc.)
+- [ ] Wire specification step into tool-creation-agent.ts before code generation
+- [ ] Add security validation check before tool registration
+- [ ] Reject unsafe tools with clear error message
+
+## Integration Testing & Checkpoint
+- [ ] Write end-to-end tests for full plan → execute → review → replan workflow
+- [ ] Test all safety limits (tool iterations, review iterations, replans, tool creations)
+- [ ] Test state machine transitions
+- [ ] Test evidence-based reviewer validation
+- [ ] Verify all 10 priorities working together
+- [ ] Save checkpoint after all tests pass

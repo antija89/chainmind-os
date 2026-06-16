@@ -327,11 +327,55 @@ export const agentMessages = mysqlTable("agent_messages", {
   role: varchar("role", { length: 32 }),
   content: text("content"),
   metadata: json("metadata"),
+  executionState: varchar("execution_state", { length: 32 }), // Current state in execution state machine
+  planId: varchar("plan_id", { length: 64 }), // Link to execution plan
   createdAt: timestamp("createdAt").defaultNow(),
 });
 
 export type AgentMessages = typeof agentMessages.$inferSelect;
 export type InsertAgentMessages = typeof agentMessages.$inferInsert;
+
+// ============ EXECUTION PLANNING & MEMORY TABLES ============
+
+export const executionPlans = mysqlTable("execution_plans", {
+  planId: varchar("plan_id", { length: 64 }).primaryKey(),
+  sessionId: varchar("session_id", { length: 64 }).notNull(),
+  agentId: varchar("agent_id", { length: 64 }).notNull(),
+  userId: int("user_id"),
+  goal: text("goal").notNull(), // User's request/goal
+  requiredInformation: json("required_information"), // Array of required info fields
+  executionSteps: json("execution_steps").notNull(), // Array of planned steps
+  dependencies: json("dependencies"), // Step dependencies
+  successCriteria: json("success_criteria"), // Success criteria for plan
+  planStatus: mysqlEnum("plan_status", ["draft", "reviewed", "approved", "executing", "completed", "failed"]).default("draft"),
+  planReviewScore: int("plan_review_score"), // Score from Plan Reviewer (0-100)
+  planReviewFeedback: text("plan_review_feedback"), // Reviewer feedback
+  replansAttempted: int("replans_attempted").default(0), // Number of times replanned
+  createdAt: timestamp("createdAt").defaultNow(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow(),
+});
+
+export type ExecutionPlan = typeof executionPlans.$inferSelect;
+export type InsertExecutionPlan = typeof executionPlans.$inferInsert;
+
+export const planExecutions = mysqlTable("plan_executions", {
+  executionId: varchar("execution_id", { length: 64 }).primaryKey(),
+  planId: varchar("plan_id", { length: 64 }).notNull(),
+  stepNumber: int("step_number").notNull(), // Step index in plan
+  toolId: varchar("tool_id", { length: 64 }).notNull(),
+  toolName: varchar("tool_name", { length: 256 }),
+  toolInput: json("tool_input").notNull(),
+  toolOutput: json("tool_output"),
+  executionStatus: mysqlEnum("execution_status", ["pending", "running", "success", "error", "timeout"]).default("pending"),
+  executionTimeMs: int("execution_time_ms"), // Execution duration
+  errorMessage: text("error_message"),
+  contextBefore: json("context_before"), // Execution context before this step
+  contextAfter: json("context_after"), // Execution context after this step
+  createdAt: timestamp("createdAt").defaultNow(),
+});
+
+export type PlanExecution = typeof planExecutions.$inferSelect;
+export type InsertPlanExecution = typeof planExecutions.$inferInsert;
 
 
 // ============ TOOL MANAGEMENT TABLES ============
@@ -347,6 +391,7 @@ export const agentTools = mysqlTable("agent_tools", {
   implementation: varchar("implementation", { length: 256 }).notNull(), // Server function name
   dataSources: json("data_sources"), // Array of table names this tool queries
   complexity: mysqlEnum("complexity", ["simple", "medium", "complex"]).default("simple"),
+  capabilities: json("capabilities"), // Array of capabilities this tool provides (for registry lookup)
   isActive: boolean("is_active").default(true),
   createdBy: varchar("created_by", { length: 64 }),
   createdAt: timestamp("created_at").defaultNow(),

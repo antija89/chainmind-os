@@ -99,6 +99,7 @@ interface ChartSpec {
 }
 
 function InlineChart({ spec }: { spec: ChartSpec }) {
+  console.log('[InlineChart] Rendering chart:', { title: spec.title, type: spec.type, labels: spec.labels, values: spec.values });
   // Build recharts data array
   const data = spec.labels.map((label, i) => {
     const point: Record<string, any> = { name: label, value: spec.values?.[i] ?? 0 };
@@ -109,78 +110,83 @@ function InlineChart({ spec }: { spec: ChartSpec }) {
     }
     return point;
   });
+  console.log('[InlineChart] Data array for chart:', data);
 
   const pieData = spec.labels.map((label, i) => ({
     name: label,
     value: spec.values?.[i] ?? 0,
   }));
 
+  const chartMargin = { top: 10, right: 30, left: 20, bottom: 10 };
+
   return (
     <div className="my-4 p-4 bg-gray-50 rounded-xl border border-gray-200">
       <h4 className="text-sm font-semibold text-gray-700 mb-3 text-center">{spec.title}</h4>
-      <ResponsiveContainer width="100%" height={260}>
-        {spec.type === 'pie' ? (
-          <PieChart>
-            <Pie data={pieData} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={100} label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}>
-              {pieData.map((_, index) => (
-                <Cell key={`cell-${index}`} fill={CHART_COLORS[index % CHART_COLORS.length]} />
-              ))}
-            </Pie>
-            <Tooltip formatter={(v: number) => v.toLocaleString()} />
-            <Legend />
-          </PieChart>
-        ) : spec.type === 'line' ? (
-          <LineChart data={data} margin={{ top: 5, right: 20, left: 0, bottom: 5 }}>
-            <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
-            <XAxis dataKey="name" tick={{ fontSize: 11 }} label={spec.xLabel ? { value: spec.xLabel, position: 'insideBottom', offset: -5 } : undefined} />
-            <YAxis tick={{ fontSize: 11 }} label={spec.yLabel ? { value: spec.yLabel, angle: -90, position: 'insideLeft' } : undefined} />
-            <Tooltip formatter={(v: number) => v.toLocaleString()} />
-            <Legend />
-            {spec.dataset ? (
-              spec.dataset.map((ds, i) => (
-                <Line key={ds.name} type="monotone" dataKey={ds.name} stroke={CHART_COLORS[i % CHART_COLORS.length]} strokeWidth={2} dot={false} />
-              ))
-            ) : (
-              <Line type="monotone" dataKey="value" stroke={CHART_COLORS[0]} strokeWidth={2} dot={{ r: 4 }} />
-            )}
-          </LineChart>
-        ) : spec.type === 'area' ? (
-          <AreaChart data={data} margin={{ top: 5, right: 20, left: 0, bottom: 5 }}>
-            <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
-            <XAxis dataKey="name" tick={{ fontSize: 11 }} />
-            <YAxis tick={{ fontSize: 11 }} />
-            <Tooltip formatter={(v: number) => v.toLocaleString()} />
-            <Legend />
-            {spec.dataset ? (
-              spec.dataset.map((ds, i) => (
-                <Area key={ds.name} type="monotone" dataKey={ds.name} stroke={CHART_COLORS[i % CHART_COLORS.length]} fill={CHART_COLORS[i % CHART_COLORS.length] + '33'} strokeWidth={2} />
-              ))
-            ) : (
-              <Area type="monotone" dataKey="value" stroke={CHART_COLORS[0]} fill={CHART_COLORS[0] + '33'} strokeWidth={2} />
-            )}
-          </AreaChart>
-        ) : (
-          // Default: bar chart
-          <BarChart data={data} margin={{ top: 5, right: 20, left: 0, bottom: 5 }}>
-            <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
-            <XAxis dataKey="name" tick={{ fontSize: 11 }} label={spec.xLabel ? { value: spec.xLabel, position: 'insideBottom', offset: -5 } : undefined} />
-            <YAxis tick={{ fontSize: 11 }} label={spec.yLabel ? { value: spec.yLabel, angle: -90, position: 'insideLeft' } : undefined} />
-            <Tooltip formatter={(v: number) => v.toLocaleString()} />
-            <Legend />
-            {spec.dataset ? (
-              spec.dataset.map((ds, i) => (
-                <Bar key={ds.name} dataKey={ds.name} fill={CHART_COLORS[i % CHART_COLORS.length]} radius={[4, 4, 0, 0]} />
-              ))
-            ) : (
-              <Bar dataKey="value" fill={CHART_COLORS[0]} radius={[4, 4, 0, 0]}>
-                {data.map((_, index) => (
+      <div style={{ width: '100%', height: 280, overflow: 'hidden' }}>
+        <ResponsiveContainer width="99%" height={280}>
+          {spec.type === 'pie' ? (
+            <PieChart>
+              <Pie data={pieData} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={100} label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}>
+                {pieData.map((_, index) => (
                   <Cell key={`cell-${index}`} fill={CHART_COLORS[index % CHART_COLORS.length]} />
                 ))}
-              </Bar>
-            )}
-          </BarChart>
-        )}
-      </ResponsiveContainer>
+              </Pie>
+              <Tooltip formatter={(v: number) => v.toLocaleString()} />
+              <Legend />
+            </PieChart>
+          ) : spec.type === 'line' ? (
+            <LineChart data={data} margin={chartMargin}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+              <XAxis dataKey="name" tick={{ fontSize: 11 }} />
+              <YAxis tick={{ fontSize: 11 }} width={60} />
+              <Tooltip formatter={(v: number) => v.toLocaleString()} />
+              <Legend />
+              {spec.dataset ? (
+                spec.dataset.map((ds, i) => (
+                  <Line key={ds.name} type="monotone" dataKey={ds.name} stroke={CHART_COLORS[i % CHART_COLORS.length]} strokeWidth={2} dot={false} />
+                ))
+              ) : (
+                <Line type="monotone" dataKey="value" stroke={CHART_COLORS[0]} strokeWidth={2} dot={{ r: 4 }} />
+              )}
+            </LineChart>
+          ) : spec.type === 'area' ? (
+            <AreaChart data={data} margin={chartMargin}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+              <XAxis dataKey="name" tick={{ fontSize: 11 }} />
+              <YAxis tick={{ fontSize: 11 }} width={60} />
+              <Tooltip formatter={(v: number) => v.toLocaleString()} />
+              <Legend />
+              {spec.dataset ? (
+                spec.dataset.map((ds, i) => (
+                  <Area key={ds.name} type="monotone" dataKey={ds.name} stroke={CHART_COLORS[i % CHART_COLORS.length]} fill={CHART_COLORS[i % CHART_COLORS.length] + '33'} strokeWidth={2} />
+                ))
+              ) : (
+                <Area type="monotone" dataKey="value" stroke={CHART_COLORS[0]} fill={CHART_COLORS[0] + '33'} strokeWidth={2} />
+              )}
+            </AreaChart>
+          ) : (
+            // Default: bar chart
+            <BarChart data={data} margin={chartMargin}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+              <XAxis dataKey="name" tick={{ fontSize: 11 }} />
+              <YAxis tick={{ fontSize: 11 }} width={60} />
+              <Tooltip formatter={(v: number) => v.toLocaleString()} />
+              <Legend />
+              {spec.dataset ? (
+                spec.dataset.map((ds, i) => (
+                  <Bar key={ds.name} dataKey={ds.name} fill={CHART_COLORS[i % CHART_COLORS.length]} radius={[4, 4, 0, 0]} />
+                ))
+              ) : (
+                <Bar dataKey="value" fill={CHART_COLORS[0]} radius={[4, 4, 0, 0]}>
+                  {data.map((_, index) => (
+                    <Cell key={`cell-${index}`} fill={CHART_COLORS[index % CHART_COLORS.length]} />
+                  ))}
+                </Bar>
+              )}
+            </BarChart>
+          )}
+        </ResponsiveContainer>
+      </div>
     </div>
   );
 }
