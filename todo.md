@@ -394,3 +394,10 @@
 - [ ] Test evidence-based reviewer validation
 - [ ] Verify all 10 priorities working together
 - [ ] Save checkpoint after all tests pass
+
+
+## Critical Bug Fixes (User-Reported)
+- [x] Fix chat history truncation - history erases after a certain point
+- [x] Add LLM thinking display - show thinking in collapsible section
+- [x] Add tool execution streaming - show tool calls in real-time
+- [x] Implement stop button - convert send to stop during processing, cancel LLM/tool execution

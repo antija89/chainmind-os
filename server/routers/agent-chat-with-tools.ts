@@ -715,7 +715,20 @@ export const agentChatWithToolsRouter = router({
             userId: ctx.user?.id,
             content: assistantContent,
             role: 'assistant',
-            metadata: { toolResults, toolCount: toolResults.length, userMessage: input.message, messageId },
+            metadata: {
+              toolResults,
+              toolCount: toolResults.length,
+              userMessage: input.message,
+              messageId,
+              thinking: 'LLM processing',
+              executionSteps: toolResults.map((t, idx) => ({
+                step: idx + 1,
+                tool: t.toolName,
+                status: t.status,
+                result: t.result,
+                error: t.error,
+              })),
+            },
           });
         } catch {}
 
@@ -853,6 +866,14 @@ export const agentChatWithToolsRouter = router({
           success: true,
           wasRetried,
           interAgentMessages,
+          thinking: 'LLM processing your request...',
+          executionSteps: toolResults.map((t, idx) => ({
+            step: idx + 1,
+            tool: t.toolName,
+            status: t.status === 'success' ? 'success' : t.status === 'error' ? 'error' : 'pending',
+            result: t.result,
+            error: t.error,
+          })),
         };
       } catch (error) {
         console.error('[Agent Chat with Tools] Error:', error);
@@ -877,6 +898,8 @@ export const agentChatWithToolsRouter = router({
           toolsUsed: [],
           success: false,
           error: error instanceof Error ? error.message : 'Unknown error',
+          thinking: 'Error occurred during processing',
+          executionSteps: [],
         };
       }
     }),
@@ -895,7 +918,11 @@ export const agentChatWithToolsRouter = router({
             role: (m.role ?? 'assistant') as 'user' | 'assistant',
             content: m.content ?? '',
             timestamp: m.createdAt ?? new Date(),
-            metadata: m.metadata as any,
+            metadata: {
+              ...(m.metadata as any),
+              thinking: (m.metadata as any)?.thinking,
+              executionSteps: (m.metadata as any)?.executionSteps,
+            },
           })),
         };
       } catch {
