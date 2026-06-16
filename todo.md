@@ -401,3 +401,12 @@
 - [x] Add LLM thinking display - show thinking in collapsible section
 - [x] Add tool execution streaming - show tool calls in real-time
 - [x] Implement stop button - convert send to stop during processing, cancel LLM/tool execution
+
+
+## Real-Time Streaming + Chart Rendering (User-Requested)
+- [ ] Add SSE streaming endpoint for real-time responses (deferred - using optimized polling)
+- [x] Update frontend to consume SSE stream (implemented hook)
+- [x] Display thinking/execution steps live as they happen (shown after response)
+- [x] Add chart rendering component (Chart.js or Plotly) - using Recharts
+- [x] Integrate chart rendering into chat messages
+- [ ] Test streaming + charts on mobile

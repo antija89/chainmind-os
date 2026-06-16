@@ -8,6 +8,7 @@ import { Spinner } from '@/components/ui/spinner';
 import { Badge } from '@/components/ui/badge';
 import { AlertCircle, CheckCircle2, Clock, Zap, ChevronDown, ChevronRight, Square } from 'lucide-react';
 import { Streamdown } from 'streamdown';
+import { ChartRenderer } from '@/components/ChartRenderer';
 
 interface ToolCall {
   toolName: string;
@@ -35,6 +36,7 @@ interface Message {
     result?: any;
     error?: string;
   }>;
+  chartSpec?: any;
 }
 
 export function AgentChatEnhanced() {
@@ -70,14 +72,23 @@ export function AgentChatEnhanced() {
 
   const sendMessageMutation = trpc.agentChatWithTools.sendMessage.useMutation({
     onSuccess: (result) => {
+      let chartSpec: any = undefined;
+      if ((result as any).toolResults && Array.isArray((result as any).toolResults)) {
+        const chartResult = (result as any).toolResults.find((t: any) => t.toolName === 'generate_chart');
+        if (chartResult && chartResult.result) {
+          chartSpec = chartResult.result;
+        }
+      }
+
       const newMessage: Message = {
         id: `msg_${Date.now()}`,
         role: 'assistant',
-        content: result.response || '',
-        toolCalls: (result.toolResults || []) as ToolCall[],
+        content: (result as any).response,
+        toolCalls: (result as any).toolResults,
         timestamp: new Date(),
         thinking: (result as any).thinking,
         executionSteps: (result as any).executionSteps,
+        chartSpec,
       };
       setMessages(prev => [...prev, newMessage]);
       setInput('');
@@ -213,6 +224,11 @@ export function AgentChatEnhanced() {
               {/* Execution Steps */}
               {message.executionSteps && message.executionSteps.length > 0 && (
                 <ExecutionStepsSection steps={message.executionSteps} />
+              )}
+
+              {/* Chart Rendering */}
+              {message.chartSpec && (
+                <ChartRenderer spec={message.chartSpec} height={350} />
               )}
 
               {/* Tool Calls */}
