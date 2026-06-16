@@ -7,6 +7,7 @@ import { ThemeProvider } from "./contexts/ThemeContext";
 import ChainMindLayout from "./components/ChainMindLayout";
 import Dashboard from "./pages/Dashboard";
 import AgentChat from "./pages/AgentChat";
+import { AgentChatEnhanced } from "./pages/AgentChatEnhanced";
 import HilInbox from "./pages/HilInbox";
 import DataTables from "./pages/DataTables";
 import DataImport from "./pages/DataImport";
@@ -25,7 +26,7 @@ function Router() {
   return (
     <Switch>
       <Route path="/" component={() => <ChainMindLayout><Dashboard /></ChainMindLayout>} />
-      <Route path="/agent/:agentId" component={() => <ChainMindLayout><AgentChat /></ChainMindLayout>} />
+      <Route path="/agent/:agentId" component={() => <ChainMindLayout><AgentChatEnhanced /></ChainMindLayout>} />
       <Route path="/hil-inbox" component={() => <ChainMindLayout><HilInbox /></ChainMindLayout>} />
       <Route path="/data-tables" component={() => <ChainMindLayout><DataTables /></ChainMindLayout>} />
       <Route path="/data-import" component={() => <ChainMindLayout><DataImport /></ChainMindLayout>} />
